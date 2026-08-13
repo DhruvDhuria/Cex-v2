@@ -12,8 +12,73 @@ datasource db {
   provider = "postgresql"
 }
 
+
+enum OrderType {
+  LIMIT
+  MARKET
+}
+
+enum OrderSide {
+  SELL
+  BUY
+}
+
+enum OrderStatus {
+  OPEN
+  FILLED
+  CANCELLED
+}
+
+enum FillType {
+  MAKER
+  TAKER
+}
+
 model User {
   id       String @id @default(uuid())
   username String @unique
   password String
+
+  orders  Order[]
+  fills   Fill[]
+}
+
+model Stock {
+  id        String    @id   @default(uuid())
+  name      String    @unique
+  symbol    String    @unique
+
+  orders    Order[]
+  fills    Fill[]
+}
+
+model Order {
+  id    String      @id   @default(uuid())
+  userId    String
+  market    String
+  price     Int?    
+  quantity  Int
+  type      OrderType
+  side      OrderSide
+  filledQuantity   Int
+  status            OrderStatus
+  
+  user    User    @relation(fields: [userId], references: [id])
+  stock   Stock   @relation(fields: [market], references: [symbol])
+  fills   Fill[]
+}
+
+model Fill {
+  id                String    @id   @default(uuid())
+  quantity          Int
+  side              OrderSide
+  type              FillType
+  userId            String
+  price             Int
+  asset             String
+  orignalOrderId    String
+
+  user    User  @relation(fields: [userId], references: [id])
+  order   Order @relation(fields: [orignalOrderId], references: [id])
+  stock   Stock @relation(fields: [asset], references: [symbol])
 }
