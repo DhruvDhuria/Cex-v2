@@ -35,4 +35,49 @@ export async function signup(req: Request, res: Response): Promise<void> {
 
 export async function signin(req: Request, res: Response): Promise<void> {
   //TODO: Implement signin logic
+  const parsedBody = authSchema.safeParse(req.body);
+  if (!parsedBody.success) {
+    sendValidationError(res, parsedBody.error);
+    return;
+  }
+
+  const {username, password} = parsedBody.data
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        username
+      }
+    })
+
+    if(!user) {
+      res.status(404).json({
+        error: "Cannot find user"
+      })
+      return
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password)
+
+    if(!validPassword) {
+      res.status(401).json({
+        error: "Password is incorrect"
+      })
+      return
+    }
+
+    const token = createToken({ userId: user.id });
+
+    res.json({
+      message: "Signed in successfully",
+      token
+    })
+
+  } catch (error) {
+    res.status(500).json({
+      error: "Something went wrong while signing you in"
+    })
+  }
+
+  
 }
