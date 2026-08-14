@@ -45,6 +45,7 @@ export interface Fill {
 }
 
 export interface OrderBook {
+  lastTradedPrice: number | null;
   bids: Map<number, RestingOrder[]>;
   asks: Map<number, RestingOrder[]>;
 }

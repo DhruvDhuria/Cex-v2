@@ -68,6 +68,10 @@ function handleEngineRequest(message: EngineRequest): unknown {
 
   // just checking the flow, remove this when you start implementing the logic
   if (message.type === "create_order") {
+
+    const order = message.payload
+
+    
     return {
       orderId: crypto.randomUUID(),
       status: "filled",
