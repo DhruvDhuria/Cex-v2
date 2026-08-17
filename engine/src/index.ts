@@ -1,6 +1,10 @@
 import "dotenv/config";
 import { createClient } from "redis";
 import { env } from "./utils/env.js";
+import { matchAlgorithm, type Order } from "./utils/matchAlgorithm.js";
+
+import { ORDERS, type Fill, type OrderType, type Side } from "./store/exchange-store.js";
+import { get_Depth } from "./utils/orderbook.js";
 
 export type EngineCommandType =
   | "create_order"
@@ -21,6 +25,31 @@ export interface EngineResponse {
   ok: boolean;
   data?: unknown;
   error?: string;
+}
+
+function isOrder(data: unknown): data is Order {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "type" in data &&
+    "side" in data &&
+    "symbol" in data &&
+    typeof (data as any).symbol === "string" &&
+    "qty" in data &&
+    typeof (data as any).qty === "number" &&
+    "userId" in data &&
+    typeof (data as any).userId === "string" &&
+    ("price" in data ? (data as any).price === null || typeof (data as any).price === "number" : false)
+  );
+}
+
+function isSymbol(data: unknown): data is { symbol: string } {
+  return (
+    typeof data === "object" && data !== null &&
+    "symbol" in data &&
+
+    typeof (data as any).symbol === "string"
+  )
 }
 
 const brokerClient = createClient({ url: env.redisUrl }).on("error", (error) => {
@@ -70,28 +99,74 @@ function handleEngineRequest(message: EngineRequest): unknown {
   if (message.type === "create_order") {
 
     const order = message.payload
+    
+    if(!isOrder(order)) {
+      return {
+        error: "invalid order"
+      }
+    }
 
+    const result = matchAlgorithm(order)
+
+    if(!result) {
+      return{
+        error: "something went wrong"
+      }
+    }
+    if (result.error) {
+      return {
+        error: result.error,
+      };
+    }
+
+    const averagePrice = result.priceAggregate.reduce((acc: number, curr: any) => acc + curr.levelPrice * curr.matchedOrders, 0) / result.filledQty!;
+    const price = averagePrice.toFixed(2);
+
+
+    const fills: Fill[] = result.priceAggregate.map((item: any) => ({
+      fillId: crypto.randomUUID(),
+      symbol: item.symbol,
+      price: item.levelPrice,
+      qty: item.matchedOrders,
+      orderId: item.orderId,
+      type: order.type,
+      cretaedAt: Date.now(),
+    }));
+
+    ORDERS.set(result.orderId?.toString()!, {
+      userId: order.userId,
+      side: order.side,
+      type: order.type,
+      symbol: order.symbol,
+      price: order.price,
+      qty: order.qty,
+      filledQty: result.filledQty || 0,
+      status: result.orderStatus!,
+      fills: fills,
+      createdAt: Date.now(),
+    });
     
     return {
-      orderId: crypto.randomUUID(),
-      status: "filled",
-      filledQty: DUMMY_SELL_ORDER.qty,
-      averagePrice: DUMMY_SELL_ORDER.price,
-      fills: [
-        {
-          fillId: crypto.randomUUID(),
-          symbol: DUMMY_SELL_ORDER.symbol,
-          price: DUMMY_SELL_ORDER.price,
-          qty: DUMMY_SELL_ORDER.qty,
-          buyOrderId: "request-buy-order",
-          sellOrderId: DUMMY_SELL_ORDER.orderId,
-        },
-      ],
-      note: "Smoke-test response only. Students must replace this with real matching logic.",
+      orderId: result.orderId,
+      status: result.orderStatus,
+      filledQty: result.filledQty,
+      averagePrice: price,
+      fills: fills,
     };
-  }
+  }else if(message.type === "get_depth") {
 
-  throw new Error("TODO(student): implement this engine request type");
+    if(!isSymbol(message.payload)) {
+      return {
+        error: "invalid symbol"
+      }
+    }
+    const depth = get_Depth(message.payload.symbol)
+    return {
+      symbol: message.payload.symbol,
+      asks: depth.asks,
+      bids: depth.bids
+    }
+  }
 }
 
 console.log(`Engine listening on Redis queue: ${env.incomingQueue}`);

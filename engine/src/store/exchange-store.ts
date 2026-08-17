@@ -21,7 +21,6 @@ export interface RestingOrder {
 }
 
 export interface OrderRecord {
-  orderId: string;
   userId: string;
   side: Side;
   type: OrderType;
@@ -39,8 +38,8 @@ export interface Fill {
   symbol: string;
   price: number;
   qty: number;
-  buyOrderId: string;
-  sellOrderId: string;
+  type: string;
+  orderId: string;
   createdAt: number;
 }
 

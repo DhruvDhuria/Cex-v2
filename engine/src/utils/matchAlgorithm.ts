@@ -1,7 +1,7 @@
 import {type OrderType, type Side, type Balance, type OrderStatus} from "../store/exchange-store.ts";
 import { ORDERBOOKS, BALANCES } from "../store/exchange-store.ts";
 
-interface Order {
+export interface Order {
     type: OrderType
     side: Side
     symbol: string;
@@ -44,7 +44,9 @@ export function matchAlgorithm(order: Order) {
   const {type, side, symbol, price, qty, userId} = order
   const {sortedAsks, sortedBids} = SortAsksAndBids(symbol)
 
-
+  const orderId = crypto.randomUUID();
+  let orderStatus: OrderStatus;
+  
   let filledQty = 0;
   const user = BALANCES.get(userId)
 
@@ -59,7 +61,7 @@ export function matchAlgorithm(order: Order) {
   }
 
   if(type === "market"){
-
+    
     if(side === "buy"){
       if(asset.asks.size === 0) {
         return { error: "No asks available for market buy orders" };
@@ -139,7 +141,7 @@ export function matchAlgorithm(order: Order) {
             priceAggregate.push({
               levelPrice: price,
               matchedOrders: delta,
-              matchedUser: sellerId,
+              sellerId,
               orderId: order.orderId
             })
             order.filledQty += delta;
@@ -151,9 +153,18 @@ export function matchAlgorithm(order: Order) {
 
       }
        
+      if(filledQty > 0 && filledQty < qty) {
+        orderStatus = "partially_filled";
+      }if(filledQty === qty) {
+        orderStatus = "filled";
+      }else {
+        orderStatus = "cancelled"
+      }
       return {
         filledQty,
-        priceAggregate
+        priceAggregate,
+        orderId,
+        orderStatus
       }
     }else {
       if(asset.bids.size === 0) {
@@ -225,7 +236,7 @@ export function matchAlgorithm(order: Order) {
             priceAggregate.push({
               levelPrice: price,
               matchedOrders: delta,
-              matchedUser: buyerId,
+              buyerId,
               orderId: order.orderId
             })
             order.filledQty += delta;
@@ -235,9 +246,20 @@ export function matchAlgorithm(order: Order) {
         }
       }
 
+       if (filledQty > 0 && filledQty < qty) {
+         orderStatus = "partially_filled";
+       }
+       if (filledQty === qty) {
+         orderStatus = "filled";
+       } else {
+         orderStatus = "cancelled";
+       }
+
       return {
         filledQty,
-        priceAggregate
+        priceAggregate,
+        orderId,
+        orderStatus
       }
     }
 
@@ -247,7 +269,7 @@ export function matchAlgorithm(order: Order) {
     }
 
     const priceAggregate: any = []
-    let orderStatus: OrderStatus;
+    
 
     if(side == "buy") {
       const totalcost = price * qty;
@@ -312,7 +334,7 @@ export function matchAlgorithm(order: Order) {
             priceAggregate.push({
               levelPrice: price,
               matchedOrders: delta,
-              matchedUser: sellerId,
+              sellerId,
               orderId: order.orderId
             })
             order.filledQty += delta;
@@ -328,6 +350,12 @@ export function matchAlgorithm(order: Order) {
         orderStatus = "partially_filled";
       }else if(filledQty === qty) {
         orderStatus = "filled";
+        return {
+          filledQty,
+          priceAggregate,
+          orderId,
+          orderStatus
+        }
       }else {
         orderStatus = "open";
       }
@@ -336,7 +364,9 @@ export function matchAlgorithm(order: Order) {
       
       return {
         filledQty,
-        priceAggregate
+        priceAggregate,
+        orderId,
+        orderStatus
       } 
 
     }else {
@@ -402,7 +432,7 @@ export function matchAlgorithm(order: Order) {
             priceAggregate.push({
               levelPrice: price,
               matchedOrders: delta,
-              matchedUser: buyerId,
+              buyerId,
               orderId: order.orderId
             })
             order.filledQty += delta;
@@ -417,6 +447,12 @@ export function matchAlgorithm(order: Order) {
         orderStatus = "partially_filled";
       } else if (filledQty === qty) {
         orderStatus = "filled";
+        return{
+          filledQty,
+          priceAggregate,
+          orderId,
+          orderStatus
+        }
       } else {
         orderStatus = "open";
       }
@@ -427,7 +463,7 @@ export function matchAlgorithm(order: Order) {
           side,
           type,
           userId,
-          orderId: crypto.randomUUID(),
+          orderId,
           qty: qty - filledQty,
           filledQty: 0,
           status: orderStatus,
@@ -438,7 +474,9 @@ export function matchAlgorithm(order: Order) {
       ]);
       return {
         filledQty,
-        priceAggregate
+        priceAggregate,
+        orderId,
+        orderStatus
       }
     }
   }  
