@@ -2,8 +2,7 @@ import "dotenv/config";
 import { createClient } from "redis";
 import { env } from "./utils/env.js";
 import { matchAlgorithm, type Order } from "./utils/matchAlgorithm.js";
-
-import { ORDERS, type Fill, type OrderType, type Side } from "./store/exchange-store.js";
+import { BALANCES, ORDERS, type Fill, type OrderType, type Side } from "./store/exchange-store.js";
 import { get_Depth } from "./utils/orderbook.js";
 
 export type EngineCommandType =
@@ -43,12 +42,21 @@ function isOrder(data: unknown): data is Order {
   );
 }
 
-function isSymbol(data: unknown): data is { symbol: string } {
+
+function isId(data: unknown, requestType: string): data is { value: string } {
+
+  let value;
+  if(requestType === "get_order" || requestType === "cancel_order") {
+    value = "orderId";
+  }else if(requestType === "get_user_balance") {
+    value = "userId";
+  }else {
+    value = "symbol";
+  }
   return (
     typeof data === "object" && data !== null &&
-    "symbol" in data &&
-
-    typeof (data as any).symbol === "string"
+    value in data &&
+    typeof (data as any)[value] === "string"
   )
 }
 
@@ -61,19 +69,6 @@ const responseClient = createClient({ url: env.redisUrl }).on("error", (error) =
 });
 
 await Promise.all([brokerClient.connect(), responseClient.connect()]);
-
-// :-)) I added this just to check the flow, remove it when you start
-const DUMMY_SELL_ORDER = {
-  orderId: "dummy-sell-order-1",
-  userId: "dummy-seller",
-  type: "limit",
-  side: "sell",
-  symbol: "BTC",
-  price: 100,
-  qty: 1,
-  filledQty: 0,
-  status: "open",
-};
 
 async function sendResponse(responseQueue: string, response: EngineResponse): Promise<void> {
   await responseClient.lPush(responseQueue, JSON.stringify(response));
@@ -155,16 +150,57 @@ function handleEngineRequest(message: EngineRequest): unknown {
     };
   }else if(message.type === "get_depth") {
 
-    if(!isSymbol(message.payload)) {
+    if(!isId(message.payload, message.type)) {
       return {
         error: "invalid symbol"
       }
     }
-    const depth = get_Depth(message.payload.symbol)
+    const depth = get_Depth(message.payload.value)
     return {
-      symbol: message.payload.symbol,
+      symbol: message.payload.value,
       asks: depth.asks,
       bids: depth.bids
+    }
+  } else if(message.type === "get_user_balance") {
+
+    if(!isId(message.payload, message.type)) {
+      return {
+        error: "invalid userId"
+      }
+    }
+    const balance = BALANCES.get(message.payload.value)
+    return {
+      balance
+    }
+  }else if(message.type === "get_order") {
+
+    if(!isId(message.payload, message.type)) {
+      return {
+        error: "invalid userId"
+      }
+    }
+    const order = ORDERS.get(message.payload.value)
+
+    if(!order) {
+      return {error: "order not found"}
+    }
+    return {
+      order
+    }
+  }else if(message.type === "cancel_order") {
+
+    if(!isId(message.payload, message.type)) {
+      return {
+        error: "invalid userId"
+      }
+    }
+    const order = ORDERS.get(message.payload.value)
+    const deletedOrder = ORDERS.delete(message.payload.value)
+    if(!deletedOrder) {
+      return {error: "order not found"}
+    }
+    return {
+      order
     }
   }
 }
