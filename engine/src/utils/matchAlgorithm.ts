@@ -9,7 +9,13 @@ export interface Order {
     qty: number;
     userId: string
 }
-
+export interface AggregateFill {
+  matchedOrders: number,
+  matchedUser: string,
+  totalOrderQty: number,
+  orderId: string,
+  side: string
+}
 export interface MatchResponse {
   filledQty?: number;
   priceAggregate?: {
@@ -60,6 +66,7 @@ export function matchAlgorithm(order: Order) {
     return { error: "Asset not found" };
   }
 
+  const priceAggregate: Map<number, AggregateFill[]> = new Map();
   if(type === "market"){
     
     if(side === "buy"){
@@ -87,17 +94,20 @@ export function matchAlgorithm(order: Order) {
       userUsd.locked += estimatedPrice + bufferPrice;
 
       
-      const priceAggregate: any = [];
+      
       let delta;
 
       for (const [price, orders] of sortedAsks) {
         if (filledQty >= qty) break;        
         delta = qty - filledQty 
-
+        
         if(orders.length === 0) {
           continue;
         }
-
+        
+        if(!priceAggregate.has(price)) {
+          priceAggregate.set(price, [])
+        }
         for (let i = 0; i < orders.length; i++) {
           const order = orders[i];
 
@@ -120,11 +130,12 @@ export function matchAlgorithm(order: Order) {
             seller.usd!.available += deductableAmt;
             user.market!.available += matchedOrders;
             seller.market!.locked -= matchedOrders;
-            priceAggregate.push({
-              levelPrice: price,
+            priceAggregate.get(price)?.push({
               matchedOrders: matchedOrders,
+              totalOrderQty: orders.length,
               matchedUser: sellerId,
-              orderId: order.orderId
+              orderId: order.orderId,
+              side
             })
             order.filledQty += matchedOrders;
             filledQty += matchedOrders;
@@ -138,19 +149,18 @@ export function matchAlgorithm(order: Order) {
             seller.usd!.available += deductableAmt;
             user.market!.available += delta;
             seller.market!.locked -= delta;
-            priceAggregate.push({
-              levelPrice: price,
+            priceAggregate.get(price)?.push({
               matchedOrders: delta,
-              sellerId,
-              orderId: order.orderId
-            })
+              totalOrderQty: orders.length,
+              matchedUser: sellerId,
+              orderId: order.orderId,
+              side
+            });
             order.filledQty += delta;
             filledQty += delta;
             break;
-          }
-        
+          };          
         }
-
       }
        
       if(filledQty > 0 && filledQty < qty) {
@@ -183,8 +193,6 @@ export function matchAlgorithm(order: Order) {
       if(!marketPrice) {
         return { error: "No bids available for market sell orders" };
       }
-
-      const priceAggregate: any = [];
       let delta;
 
       for (const [price, orders] of sortedBids) {
@@ -216,11 +224,12 @@ export function matchAlgorithm(order: Order) {
             buyer.market!.available += matchedOrders;
             user.usd!.available += price * matchedOrders;
             buyer.usd!.locked -= price * matchedOrders;
-            priceAggregate.push({
-              levelPrice: price,
+            priceAggregate.get(price)?.push({
               matchedOrders: matchedOrders,
+              totalOrderQty: orders.length,
               matchedUser: buyerId,
-              orderId: order.orderId
+              orderId: order.orderId,
+              side
             })
             order.filledQty += matchedOrders;
             filledQty += matchedOrders;
@@ -233,11 +242,12 @@ export function matchAlgorithm(order: Order) {
             buyer.market!.available += matchedOrders;
             user.usd!.available += price * matchedOrders;
             buyer.usd!.locked -= price * matchedOrders;
-            priceAggregate.push({
-              levelPrice: price,
+            priceAggregate.get(price)?.push({
               matchedOrders: delta,
-              buyerId,
-              orderId: order.orderId
+              totalOrderQty: orders.length,
+              matchedUser: buyerId,
+              orderId: order.orderId,
+              side
             })
             order.filledQty += delta;
             filledQty += delta;
@@ -268,9 +278,13 @@ export function matchAlgorithm(order: Order) {
       return { error: "Missing price" };
     }
 
-    const priceAggregate: any = []
+    // const priceAggregate: any = []
     
-
+    let orderbookAddUpdate: {
+      side: string,
+      price: number,
+      qty: number
+    };
     if(side == "buy") {
       const totalcost = price * qty;
       if(user.usd!.available < totalcost) {
@@ -314,11 +328,12 @@ export function matchAlgorithm(order: Order) {
             seller.usd!.available += matchedOrders * price;
             user.market!.available += matchedOrders;
             seller.market!.locked -= matchedOrders;
-            priceAggregate.push({
-              levelPrice: price,
+            priceAggregate.get(price)?.push({
               matchedOrders: matchedOrders,
+              totalOrderQty: orders.length,
               matchedUser: sellerId,
-              orderId: order.orderId
+              orderId: order.orderId,
+              side
             })
             order.filledQty += matchedOrders;
             filledQty += matchedOrders;
@@ -331,11 +346,12 @@ export function matchAlgorithm(order: Order) {
             seller.usd!.available += matchedOrders * price;
             user.market!.available += matchedOrders;
             seller.market!.locked -= matchedOrders;
-            priceAggregate.push({
-              levelPrice: price,
+            priceAggregate.get(price)?.push({
               matchedOrders: delta,
-              sellerId,
-              orderId: order.orderId
+              totalOrderQty: orders.length,
+              matchedUser: sellerId,
+              orderId: order.orderId,
+              side
             })
             order.filledQty += delta;
             filledQty += delta;
@@ -362,11 +378,18 @@ export function matchAlgorithm(order: Order) {
 
       sortedBids.set(price, [...sortedBids.get(price)!, {side, type, userId, orderId: crypto.randomUUID(), qty: qty - filledQty, filledQty: 0, status: orderStatus, symbol, price, createdAt: Date.now()}]);
       
+      orderbookAddUpdate = {
+        side, 
+        qty: qty - filledQty,
+        price
+      }
+      
       return {
         filledQty,
         priceAggregate,
         orderId,
-        orderStatus
+        orderStatus,
+        orderbookAddUpdate
       } 
 
     }else {
@@ -412,11 +435,12 @@ export function matchAlgorithm(order: Order) {
             buyer.market!.available += matchedOrders;
             user.usd!.available += matchedOrders * price;
             buyer.usd!.locked -= matchedOrders * price;
-            priceAggregate.push({
-              levelPrice: price,
+            priceAggregate.get(price)?.push({
               matchedOrders: matchedOrders,
+              totalOrderQty: order.qty,
               matchedUser: buyerId,
-              orderId: order.orderId
+              orderId: order.orderId,
+              side
             })
             order.filledQty += matchedOrders;
             filledQty += matchedOrders;
@@ -429,11 +453,12 @@ export function matchAlgorithm(order: Order) {
             buyer.market!.available += matchedOrders;
             user.usd!.available += matchedOrders * price;
             buyer.usd!.locked -= matchedOrders * price;
-            priceAggregate.push({
-              levelPrice: price,
+            priceAggregate.get(price)?.push({
               matchedOrders: delta,
-              buyerId,
-              orderId: order.orderId
+              totalOrderQty: order.qty,
+              matchedUser: buyerId,
+              orderId: order.orderId,
+              side
             })
             order.filledQty += delta;
             filledQty += delta;
@@ -472,11 +497,18 @@ export function matchAlgorithm(order: Order) {
           createdAt: Date.now(),
         },
       ]);
+
+      orderbookAddUpdate = {
+        side,
+        qty: qty - filledQty,
+        price,
+      };
       return {
         filledQty,
         priceAggregate,
         orderId,
-        orderStatus
+        orderStatus,
+        orderbookAddUpdate
       }
     }
   }  

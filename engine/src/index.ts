@@ -2,8 +2,10 @@ import "dotenv/config";
 import { createClient } from "redis";
 import { env } from "./utils/env.js";
 import { matchAlgorithm, type Order } from "./utils/matchAlgorithm.js";
-import { BALANCES, ORDERS, type Fill, type OrderType, type Side } from "./store/exchange-store.js";
+import { BALANCES, ORDERBOOKS, ORDERS, type Fill, type OrderType, type Side } from "./store/exchange-store.js";
 import { get_Depth } from "./utils/orderbook.js";
+import { type AggregateFill } from "./utils/matchAlgorithm.js";
+import { publishToStream } from "./streams.js";
 
 export type EngineCommandType =
   | "create_order"
@@ -19,6 +21,15 @@ export interface EngineRequest {
   payload: Record<string, unknown>;
 }
 
+interface DepthUPdateObject {
+  levelprice: number,
+  delta: number
+}
+interface DepthUpdates {
+  market: string,
+  asks: DepthUPdateObject[],
+  bids: DepthUPdateObject[]
+}
 export interface EngineResponse {
   correlationId: string;
   ok: boolean;
@@ -68,6 +79,7 @@ const responseClient = createClient({ url: env.redisUrl }).on("error", (error) =
   console.error("Redis response client error", error);
 });
 
+
 await Promise.all([brokerClient.connect(), responseClient.connect()]);
 
 async function sendResponse(responseQueue: string, response: EngineResponse): Promise<void> {
@@ -114,19 +126,84 @@ function handleEngineRequest(message: EngineRequest): unknown {
       };
     }
 
-    const averagePrice = result.priceAggregate.reduce((acc: number, curr: any) => acc + curr.levelPrice * curr.matchedOrders, 0) / result.filledQty!;
+    const averagePrice =
+      Array.from(result.priceAggregate!.entries()).reduce(
+        (acc: number, [priceKey, fills]) => {
+          const levelMatchedOrders = fills.reduce(
+            (sum, item) => sum + item.matchedOrders,
+            0,
+          );
+
+          return acc + priceKey * levelMatchedOrders;
+        },
+        0,
+      ) / result.filledQty!
     const price = averagePrice.toFixed(2);
 
+    let depthUpdates: DepthUpdates = {
+      market: order.symbol,
+      asks: [],
+      bids: []
+    }
+    
+    result.priceAggregate?.forEach((fills: AggregateFill[], pricekey: number) => {
+      let delta = 0;
+      fills.forEach((item: any) => {
+        const totalQty = item.totalOrderQty;
+        delta = totalQty - item.matchedOrders;
+        const tradeUpdate = {
+          price: pricekey,
+          qty: item.matchedOrders,
+        }
+        publishToStream(order.symbol, tradeUpdate, "TradesUpdate")
 
-    const fills: Fill[] = result.priceAggregate.map((item: any) => ({
-      fillId: crypto.randomUUID(),
-      symbol: item.symbol,
-      price: item.levelPrice,
-      qty: item.matchedOrders,
-      orderId: item.orderId,
-      type: order.type,
-      cretaedAt: Date.now(),
-    }));
+      })
+      if(fills[0]!.side === "buy") {
+        depthUpdates.asks.push({
+          levelprice: pricekey,
+          delta: delta
+        })
+      }else {
+        depthUpdates.bids.push({
+          levelprice: pricekey,
+          delta: delta
+        })
+      }
+
+
+    })
+
+    if(result.orderbookAddUpdate) {
+      if(result.orderbookAddUpdate.side === "buy") {
+        depthUpdates.bids.push({
+          levelprice: result.orderbookAddUpdate.price,
+          delta: result.orderbookAddUpdate.qty
+        })
+      }else {
+        depthUpdates.asks.push({
+          levelprice: result.orderbookAddUpdate.price,
+          delta: result.orderbookAddUpdate.qty
+        })
+      }
+    }
+
+
+    publishToStream(order.symbol, depthUpdates, "depthUpdate")
+
+    const fills: Fill[] = Array.from(
+      result.priceAggregate?.entries() || [],
+    ).flatMap(([priceKey, items]) => {
+      return items.map((item: any) => ({
+        fillId: crypto.randomUUID(),
+        symbol: item.symbol,
+        price: priceKey,
+        qty: item.matchedOrders,
+        orderId: item.orderId,
+        type: order.type,
+        createdAt: Date.now()
+      }));
+    });
+
 
     ORDERS.set(result.orderId?.toString()!, {
       userId: order.userId,
@@ -195,6 +272,34 @@ function handleEngineRequest(message: EngineRequest): unknown {
       }
     }
     const order = ORDERS.get(message.payload.value)
+    if(!order) {
+      return {error: "order not found"}
+    }
+    const side = order.side === 'buy'? 'bids': 'asks'
+
+    const orderbookOrder = ORDERBOOKS.get(order.symbol)?.[side].get(order.price!)?.filter(item => item.orderId !== ORDERS.keys().find(item => item === message.payload.value))
+
+    if(!orderbookOrder) {
+      return {error: "order not found"}
+    }
+
+    const depthUpdates: DepthUpdates = {
+      market: order.symbol,
+      asks: [],
+      bids: []
+    } 
+    if(side === "bids") {
+      depthUpdates.bids.push({
+        levelprice: order.price!,
+        delta: 0
+      })
+    }else {
+      depthUpdates.asks.push({
+        levelprice: order.price!,
+        delta: 0
+      })
+    }
+    
     const deletedOrder = ORDERS.delete(message.payload.value)
     if(!deletedOrder) {
       return {error: "order not found"}
