@@ -155,7 +155,7 @@ function handleEngineRequest(message: EngineRequest): unknown {
           price: pricekey,
           qty: item.matchedOrders,
         }
-        publishToStream(order.symbol, tradeUpdate, "TradesUpdate")
+        publishToStream(order.symbol ,tradeUpdate, "TradesUpdate")
 
       })
       if(fills[0]!.side === "buy") {
@@ -182,7 +182,7 @@ function handleEngineRequest(message: EngineRequest): unknown {
       }else {
         depthUpdates.asks.push({
           levelprice: result.orderbookAddUpdate.price,
-          delta: result.orderbookAddUpdate.qty
+          delta: result.orderbookAddUpdate.qty,
         })
       }
     }

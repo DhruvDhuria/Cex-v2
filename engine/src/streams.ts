@@ -22,21 +22,31 @@ export function publishToStream(market: string, data: any, type: StreamType) {
 
     if(type === "depthUpdate") {
         depthClient.xAdd(
-            `depth.${market}`,
+            `depthStream`,
             "*",
-            data
+            {                   
+                market,
+                data: JSON.stringify(data)
+            }
         )
     }else if(type === "bookTickerUpdate"){ 
         BookTickerClient.xAdd(
-            `bookticker.${market}`,
+            `booktickerStream`,
             "*",
-            data
+            {   
+                market,
+                data: JSON.stringify(data)
+            }
         )
     }else {
         AggTradesClient.xAdd(
-            `aggtrades.${market}`,
+            `aggtradesStream`,
             "*",
-            data
+            {
+                
+                market,
+                data: JSON.stringify(data)
+            }
         )
     }
 }
