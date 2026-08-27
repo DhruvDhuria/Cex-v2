@@ -12,7 +12,8 @@ export type EngineCommandType =
   | "get_depth"
   | "get_user_balance"
   | "get_order"
-  | "cancel_order";
+  | "cancel_order"
+  | "add_balance";
 
 export interface EngineRequest {
   correlationId: string;
@@ -53,13 +54,26 @@ function isOrder(data: unknown): data is Order {
   );
 }
 
+function isAddBalanceRequest(data: unknown): data is { symbol: string, amount: number, userId: string } {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "symbol" in data &&
+    "amount" in data &&
+    "userId" in data &&
+    typeof (data as any).symbol === "string" &&
+    typeof (data as any).amount === "number" &&
+    typeof (data as any).userId === "string"
+  )
+}
+
 
 function isId(data: unknown, requestType: string): data is { value: string } {
 
   let value;
   if(requestType === "get_order" || requestType === "cancel_order") {
     value = "orderId";
-  }else if(requestType === "get_user_balance") {
+  }else if(requestType === "get_user_balance" || requestType === "add_balance") {
     value = "userId";
   }else {
     value = "symbol";
@@ -307,6 +321,29 @@ function handleEngineRequest(message: EngineRequest): unknown {
     return {
       order
     }
+  }else if(message.type === "add_balance") {
+    if(!isId(message.payload, message.type)) {
+      return {
+        error: "invalid userId"
+      }
+    }
+    if(!isAddBalanceRequest(message.payload)) {
+      return {
+        error: "invalid payload"
+      }
+    }
+    const {symbol, amount} = message.payload
+
+    const balance = BALANCES.get(message.payload.value)
+    if(!balance) {
+      return {error: "user not found"}
+    }
+    balance[symbol]!.available += amount
+    
+    return {
+      balance
+    }
+
   }
 }
 

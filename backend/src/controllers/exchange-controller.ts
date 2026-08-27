@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import {
+  addBalanceBodySchema,
   orderBodySchema,
   orderIdParamSchema,
   symbolParamSchema,
@@ -93,6 +94,24 @@ export async function cancelOrder(req: Request, res: Response): Promise<void> {
     orderId,
   });
 
+  res.status(engineResponse.ok ? 200 : 400).json(engineResponse.ok ? engineResponse.data : {
+    error: engineResponse.error,
+  });
+}
+
+export async function addBalance(req: Request, res: Response): Promise<void> {
+  const parsedBody = addBalanceBodySchema.safeParse(req.body);
+  if (!parsedBody.success) {
+    sendValidationError(res, parsedBody.error);
+    return;
+  }
+
+  const { symbol, amount } = parsedBody.data;
+  const engineResponse = await sendToEngine("add_balance", {
+    userId: getUserId(req),
+    symbol,
+    amount,
+  });
   res.status(engineResponse.ok ? 200 : 400).json(engineResponse.ok ? engineResponse.data : {
     error: engineResponse.error,
   });

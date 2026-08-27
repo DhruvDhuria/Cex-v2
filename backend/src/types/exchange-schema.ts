@@ -24,3 +24,7 @@ export const orderBodySchema = z.discriminatedUnion("type", [
     qty: z.number().positive("qty must be a positive number"),
   }),
 ]);
+export const addBalanceBodySchema = z.object({ 
+  amount: z.number().positive(),
+  symbol: z.string().trim().min(1, "symbol is required") 
+});
