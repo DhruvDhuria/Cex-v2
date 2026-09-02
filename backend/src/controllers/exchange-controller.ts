@@ -41,6 +41,7 @@ export async function createOrder(req: Request, res: Response): Promise<void> {
 
 export async function getDepth(req: Request, res: Response): Promise<void> {
   const parsedParams = symbolParamSchema.safeParse(req.params);
+  console.log(parsedParams)
   if (!parsedParams.success) {
     sendValidationError(res, parsedParams.error);
     return;

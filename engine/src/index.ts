@@ -1,11 +1,20 @@
 import "dotenv/config";
-import { createClient } from "redis";
+import {  createClient } from "redis";
 import { env } from "./utils/env.js";
 import { matchAlgorithm, type Order } from "./utils/matchAlgorithm.js";
 import { BALANCES, ORDERBOOKS, ORDERS, type Fill, type OrderType, type Side } from "./store/exchange-store.js";
-import { get_Depth } from "./utils/orderbook.js";
 import { type AggregateFill } from "./utils/matchAlgorithm.js";
 import { publishToStream } from "./streams.js";
+
+const assets = ["BTC", "ETH", "SOL"]
+
+function initializeOrderBook () {
+  ORDERBOOKS.clear()
+  for (const asset of assets) {
+    ORDERBOOKS.set(asset, {lastTradedPrice: null, asks: new Map(), bids: new Map()})
+  }
+}
+initializeOrderBook()
 
 export type EngineCommandType =
   | "create_order"
@@ -68,22 +77,42 @@ function isAddBalanceRequest(data: unknown): data is { symbol: string, amount: n
 }
 
 
-function isId(data: unknown, requestType: string): data is { value: string } {
+// 1. Map the request types to their expected property names
+type RequestKeyMap = {
+  get_order: "orderId";
+  cancel_order: "orderId";
+  get_user_balance: "userId";
+  add_balance: "userId";
+};
 
-  let value;
-  if(requestType === "get_order" || requestType === "cancel_order") {
+// 2. Fallback helper: if it's in the map, use it; otherwise default to "symbol"
+type GetPayloadKey<T extends string> = T extends keyof RequestKeyMap 
+  ? RequestKeyMap[T] 
+  : "symbol";
+
+// 3. The Function with Generic narrowing
+function isId<K extends string>(
+  data: unknown, 
+  requestType: K
+): data is Record<GetPayloadKey<K>, string> {
+
+  let value: string;
+  if (requestType === "get_order" || requestType === "cancel_order") {
     value = "orderId";
-  }else if(requestType === "get_user_balance" || requestType === "add_balance") {
+  } else if (requestType === "get_user_balance" || requestType === "add_balance") {
     value = "userId";
-  }else {
+  } else {
     value = "symbol";
   }
+
   return (
-    typeof data === "object" && data !== null &&
+    typeof data === "object" && 
+    data !== null &&
     value in data &&
-    typeof (data as any)[value] === "string"
-  )
+    typeof (data as Record<string, unknown>)[value] === "string"
+  );
 }
+
 
 const brokerClient = createClient({ url: env.redisUrl }).on("error", (error) => {
   console.error("Redis broker client error", error);
@@ -129,42 +158,41 @@ function handleEngineRequest(message: EngineRequest): unknown {
 
     const result = matchAlgorithm(order)
 
-    if(!result) {
-      return{
-        error: "something went wrong"
-      }
-    }
     if (result.error) {
       return {
         error: result.error,
       };
     }
 
-    const averagePrice =
-      Array.from(result.priceAggregate!.entries()).reduce(
-        (acc: number, [priceKey, fills]) => {
-          const levelMatchedOrders = fills.reduce(
-            (sum, item) => sum + item.matchedOrders,
-            0,
-          );
-
-          return acc + priceKey * levelMatchedOrders;
-        },
-        0,
-      ) / result.filledQty!
-    const price = averagePrice.toFixed(2);
-
     let depthUpdates: DepthUpdates = {
       market: order.symbol,
       asks: [],
       bids: []
     }
-    
     result.priceAggregate?.forEach((fills: AggregateFill[], pricekey: number) => {
       let delta = 0;
       fills.forEach((item: any) => {
         const totalQty = item.totalOrderQty;
         delta = totalQty - item.matchedOrders;
+        const user = BALANCES.get(order.userId)
+        const matchedUser = BALANCES.get(item.matchedUser)
+
+        if(!user || !matchedUser) {
+          return "either user or matched user not found"
+        }
+        // settle balances for both users
+        if(order.side === "buy") {
+          matchedUser[order.symbol]!.locked-= item.matchedOrders;
+          user[order.symbol]!.available += item.matchedOrders;
+          user.usd!.locked -= item.matchedOrders * pricekey;
+          matchedUser!.usd!.available += item.matchedOrders * pricekey;
+        }else {
+          matchedUser[order.symbol]!.available += item.matchedOrders;
+          user[order.symbol]!.locked -= item.matchedOrders;
+          user.usd!.available += item.matchedOrders * pricekey;
+          matchedUser.usd!.locked -= item.matchedOrders * pricekey;
+        }
+
         const tradeUpdate = {
           price: pricekey,
           qty: item.matchedOrders,
@@ -187,6 +215,22 @@ function handleEngineRequest(message: EngineRequest): unknown {
 
     })
 
+    const averagePrice =
+      Array.from(result.priceAggregate!.entries()).reduce(
+        (acc: number, [priceKey, fills]) => {
+          const levelMatchedOrders = fills.reduce(
+            (sum, item) => sum + item.matchedOrders,
+            0,
+          );
+
+          return acc + priceKey * levelMatchedOrders;
+        },
+        0,
+      ) / result.filledQty!
+    const price = averagePrice.toFixed(2);
+
+    
+
     if(result.orderbookAddUpdate) {
       if(result.orderbookAddUpdate.side === "buy") {
         depthUpdates.bids.push({
@@ -204,12 +248,13 @@ function handleEngineRequest(message: EngineRequest): unknown {
 
     publishToStream(order.symbol, depthUpdates, "depthUpdate")
 
+    console.log(result.priceAggregate, "inthe price aggregate")
     const fills: Fill[] = Array.from(
       result.priceAggregate?.entries() || [],
     ).flatMap(([priceKey, items]) => {
-      return items.map((item: any) => ({
+      return items.map((item: AggregateFill): Fill => ({
         fillId: crypto.randomUUID(),
-        symbol: item.symbol,
+        symbol: order.symbol,
         price: priceKey,
         qty: item.matchedOrders,
         orderId: item.orderId,
@@ -246,12 +291,26 @@ function handleEngineRequest(message: EngineRequest): unknown {
         error: "invalid symbol"
       }
     }
-    const depth = get_Depth(message.payload.value)
-    return {
-      symbol: message.payload.value,
-      asks: depth.asks,
-      bids: depth.bids
-    }
+
+    const asks: {price: number, qty: number}[] = []
+    ORDERBOOKS.get(message.payload.symbol)?.asks.forEach(( order, price) => {
+      const qty = order.reduce((acc, item) => acc + item.qty, 0)
+      asks.push({price: price, qty})
+    })
+
+    const bids: {price: number, qty: number}[] = []
+    ORDERBOOKS.get(message.payload.symbol)?.bids.forEach((order, price) => {
+      const qty = order.reduce((acc, item) => acc + item.qty, 0)
+      bids.push({price: price, qty})
+    })
+          
+
+      return {
+        symbol: message.payload.symbol,
+        asks,
+        bids
+      };
+    
   } else if(message.type === "get_user_balance") {
 
     if(!isId(message.payload, message.type)) {
@@ -259,7 +318,7 @@ function handleEngineRequest(message: EngineRequest): unknown {
         error: "invalid userId"
       }
     }
-    const balance = BALANCES.get(message.payload.value)
+    const balance = BALANCES.get(message.payload.userId)
     return {
       balance
     }
@@ -270,7 +329,7 @@ function handleEngineRequest(message: EngineRequest): unknown {
         error: "invalid userId"
       }
     }
-    const order = ORDERS.get(message.payload.value)
+    const order = ORDERS.get(message.payload.orderId)
 
     if(!order) {
       return {error: "order not found"}
@@ -285,7 +344,7 @@ function handleEngineRequest(message: EngineRequest): unknown {
         error: "invalid userId"
       }
     }
-    const order = ORDERS.get(message.payload.value)
+    const order = ORDERS.get(message.payload.orderId)
     if(!order) {
       return {error: "order not found"}
     }
@@ -314,7 +373,7 @@ function handleEngineRequest(message: EngineRequest): unknown {
       })
     }
     
-    const deletedOrder = ORDERS.delete(message.payload.value)
+    const deletedOrder = ORDERS.delete(message.payload.orderId)
     if(!deletedOrder) {
       return {error: "order not found"}
     }
@@ -332,14 +391,32 @@ function handleEngineRequest(message: EngineRequest): unknown {
         error: "invalid payload"
       }
     }
-    const {symbol, amount} = message.payload
+    const {symbol, amount, userId} = message.payload
 
-    const balance = BALANCES.get(message.payload.value)
+    let balance = BALANCES.get(userId)
+
+    console.log(message.payload.userId, BALANCES)
+
     if(!balance) {
-      return {error: "user not found"}
+      BALANCES.set(userId, {})
     }
-    balance[symbol]!.available += amount
+    balance = BALANCES.get(userId)
+    if(!balance) {
+      return {
+        error: "user not found"
+      }
+    }
     
+
+    if(!balance[symbol]) {
+      balance[symbol] = {
+        available: 0,
+        locked: 0
+      }
+    }
+
+    balance[symbol].available += amount
+ 
     return {
       balance
     }

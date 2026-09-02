@@ -84,6 +84,7 @@ wss.on("connection", (ws) => {
             const parsedData = JSON.parse(message.toString());
 
             if (parsedData.method === "SUBSCRIBE") {
+              console.log("ws subscribe", parsedData)
               parsedData.params.forEach((params: any) => {
                 if (!activeSubscriptions[params]) {
                   activeSubscriptions[params] = [];
@@ -93,6 +94,7 @@ wss.on("connection", (ws) => {
                 }
               });
             } else if (parsedData.method === "UNSUBSCRIBE") {
+              console.log("ws subscribe", parsedData);
               parsedData.params.forEach((param: any) => {
                 if (!activeSubscriptions[param]) {
                   activeSubscriptions[param] = [];
