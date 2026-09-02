@@ -180,17 +180,23 @@ function handleEngineRequest(message: EngineRequest): unknown {
         if(!user || !matchedUser) {
           return "either user or matched user not found"
         }
+        // set default balances if they don't exist to 0 so that we don't get undefined errors when updating balances
+        user.usd = user.usd || { available: 0, locked: 0 };
+        matchedUser.usd = matchedUser.usd || { available: 0, locked: 0 };
+        user[order.symbol] = user[order.symbol] || { available: 0, locked: 0 };
+        matchedUser[order.symbol] = matchedUser[order.symbol] || { available: 0, locked: 0 };
+        
         // settle balances for both users
         if(order.side === "buy") {
           matchedUser[order.symbol]!.locked-= item.matchedOrders;
           user[order.symbol]!.available += item.matchedOrders;
-          user.usd!.locked -= item.matchedOrders * pricekey;
-          matchedUser!.usd!.available += item.matchedOrders * pricekey;
+          user.usd.locked -= item.matchedOrders * pricekey;
+          matchedUser!.usd.available += item.matchedOrders * pricekey;
         }else {
           matchedUser[order.symbol]!.available += item.matchedOrders;
           user[order.symbol]!.locked -= item.matchedOrders;
-          user.usd!.available += item.matchedOrders * pricekey;
-          matchedUser.usd!.locked -= item.matchedOrders * pricekey;
+          user.usd.available += item.matchedOrders * pricekey;
+          matchedUser.usd.locked -= item.matchedOrders * pricekey;
         }
 
         const tradeUpdate = {

@@ -29,13 +29,11 @@ export interface MatchResponse {
 };
 
 function SortAsksAndBids(symbol: string) {
-    const sortedAsks = new Map(
-      [...(ORDERBOOKS.get(symbol)?.asks.entries() || [])].sort(
+    const sortedAsks = new Map([...(ORDERBOOKS.get(symbol)?.asks.entries() || [])].sort(
         (a, b) => a[0] - b[0],
-      ),
-    );
-    const sortedBids = new Map(
-      [...(ORDERBOOKS.get(symbol)?.bids.entries() || [])].sort(
+      ))
+    
+    const sortedBids = new Map([...(ORDERBOOKS.get(symbol)?.bids.entries() || [])].sort(
         (a, b) => b[0] - a[0],
     ))
 
@@ -46,7 +44,6 @@ function SortAsksAndBids(symbol: string) {
 }
 
 export function matchAlgorithm(order: Order) {
-  console.log(order)
   
   const {type, side, symbol, price, qty, userId} = order
   const {sortedAsks, sortedBids} = SortAsksAndBids(symbol)
@@ -66,6 +63,8 @@ export function matchAlgorithm(order: Order) {
   if(!asset) {
     return { error: "Asset not found" };
   }
+  user.usd = user.usd || { available: 0, locked: 0 };
+  user[symbol] = user[symbol] || { available: 0, locked: 0 };
 
   const priceAggregate: Map<number, AggregateFill[]> = new Map();
   if(type === "market"){
@@ -96,16 +95,17 @@ export function matchAlgorithm(order: Order) {
   
       let delta;
 
-      for (const [price, orders] of sortedAsks) {
+      for (const [askPrice, orders] of sortedAsks) {
         if (filledQty >= qty) break;        
         delta = qty - filledQty 
         
-        if(orders.length === 0) {
+        if(orders.length === 0) { 
+          ORDERBOOKS.get(symbol)?.asks.delete(askPrice);
           continue;
         }
         
-        if(!priceAggregate.has(price)) {
-          priceAggregate.set(price, [])
+        if(!priceAggregate.has(askPrice)) {
+          priceAggregate.set(askPrice, [])
         }
         for (let i = 0; i < orders.length; i++) {
           const order = orders[i];
@@ -124,7 +124,7 @@ export function matchAlgorithm(order: Order) {
           const matchedOrders = Math.min(order.qty, delta);
 
           if(order.qty <= delta){
-            let AggreatedOrders = priceAggregate.get(price)?? priceAggregate.set(price, [] ).get(price)!;
+            let AggreatedOrders = priceAggregate.get(askPrice)?? priceAggregate.set(askPrice, [] ).get(askPrice)!;
             AggreatedOrders.push({
               matchedOrders: matchedOrders,
               totalOrderQty: orders.length,
@@ -136,11 +136,17 @@ export function matchAlgorithm(order: Order) {
             filledQty += matchedOrders;
             order.status = "filled";
             
-            order.status = "filled";
-            orders.slice(i, 1);
+            const ordersToUpdate = ORDERBOOKS.get(symbol)!.asks.get(askPrice)!;
+            const idx = ordersToUpdate.findIndex((o) => o.orderId === order.orderId);
+            if(idx !== -1) {
+              ordersToUpdate.splice(idx, 1);
+            }
+            if(ordersToUpdate.length === 0) {
+              ORDERBOOKS.get(symbol)?.asks.delete(askPrice);
+            }
             
           }else {
-            let AggreatedOrders = priceAggregate.get(price)?? priceAggregate.set(price, [] ).get(price)!;
+            let AggreatedOrders = priceAggregate.get(askPrice)?? priceAggregate.set(askPrice, [] ).get(askPrice)!;
             AggreatedOrders.push({
               matchedOrders: delta,
               totalOrderQty: orders.length,
@@ -173,12 +179,12 @@ export function matchAlgorithm(order: Order) {
         return { error: "No bids available for market sell orders" };
       }
 
-      if(user[symbol]!.available < qty) {
+      if(user[symbol].available < qty) {
         return { error: "Insufficient balance" };
       }
 
-      user[symbol]!.available -= qty;
-      user[symbol]!.locked += qty;
+      user[symbol].available -= qty;
+      user[symbol].locked += qty;
 
       const marketPrice = asset.lastTradedPrice ? asset.lastTradedPrice : sortedBids.keys().next().value;
 
@@ -187,11 +193,12 @@ export function matchAlgorithm(order: Order) {
       }
       let delta;
 
-      for (const [price, orders] of sortedBids) {
+      for (const [bidPrice, orders] of sortedBids) {
         if (filledQty >= qty) break;        
         delta = qty - filledQty 
 
         if(orders.length === 0) {
+          ORDERBOOKS.get(symbol)?.bids.delete(bidPrice);
           continue;
         }
 
@@ -212,7 +219,7 @@ export function matchAlgorithm(order: Order) {
           const matchedOrders = Math.min(order.qty, delta);
 
           if(order.qty <= delta){
-            let AggreatedOrders = priceAggregate.get(price)?? priceAggregate.set(price, [] ).get(price)!;
+            let AggreatedOrders = priceAggregate.get(bidPrice)?? priceAggregate.set(bidPrice, [] ).get(bidPrice)!;
             AggreatedOrders.push({
               matchedOrders: matchedOrders,
               totalOrderQty: orders.length,
@@ -224,10 +231,16 @@ export function matchAlgorithm(order: Order) {
             filledQty += matchedOrders;
             order.status = "filled";
             
-            orders.slice(i, 1);
-            
+            const ordersToUpdate = ORDERBOOKS.get(symbol)!.bids.get(bidPrice)!;
+            const idx = ordersToUpdate.findIndex((o) => o.orderId === order.orderId);
+            if (idx !== -1) {
+              ordersToUpdate.splice(idx, 1);
+            }
+            if(ordersToUpdate.length === 0) {
+              ORDERBOOKS.get(symbol)?.bids.delete(bidPrice);
+            }
           }else {
-            let AggreatedOrders = priceAggregate.get(price)?? priceAggregate.set(price, [] ).get(price)!;
+            let AggreatedOrders = priceAggregate.get(bidPrice)?? priceAggregate.set(bidPrice, [] ).get(bidPrice)!;
             AggreatedOrders.push({
               matchedOrders: delta,
               totalOrderQty: orders.length,
@@ -290,6 +303,7 @@ export function matchAlgorithm(order: Order) {
         }
 
         if(orders.length === 0) {
+          ORDERBOOKS.get(symbol)?.asks.delete(askPrice);
           continue;
         }
 
@@ -310,7 +324,7 @@ export function matchAlgorithm(order: Order) {
           const matchedOrders = Math.min(order.qty, delta);
 
           if(order.qty <= delta){
-            let AggreatedOrders = priceAggregate.get(price)?? priceAggregate.set(price, [] ).get(price)!;
+            let AggreatedOrders = priceAggregate.get(askPrice)?? priceAggregate.set(askPrice, [] ).get(askPrice)!;
             AggreatedOrders.push({
               matchedOrders: matchedOrders,
               totalOrderQty: orders.length,
@@ -322,10 +336,17 @@ export function matchAlgorithm(order: Order) {
             filledQty += matchedOrders;
             order.status = "filled";
             
-            orders.slice(i, 1);
+            const orderstoUpdate = ORDERBOOKS.get(symbol)!.asks.get(askPrice)!;
+            const idx = orderstoUpdate.findIndex((o) => o.orderId === order.orderId);
+            if (idx !== -1) {
+              orderstoUpdate.splice(idx, 1);
+            }
+            if(orderstoUpdate.length === 0) {
+              ORDERBOOKS.get(symbol)?.asks.delete(askPrice);
+            }
             
           }else {
-            let AggreatedOrders = priceAggregate.get(price)?? priceAggregate.set(price, [] ).get(price)!;
+            let AggreatedOrders = priceAggregate.get(askPrice)?? priceAggregate.set(askPrice, [] ).get(askPrice)!;
             AggreatedOrders.push({
               matchedOrders: delta,
               totalOrderQty: orders.length,
@@ -333,6 +354,11 @@ export function matchAlgorithm(order: Order) {
               orderId: order.orderId,
               side
             })
+            ORDERBOOKS.get(symbol)!.asks.get(askPrice)![i]! = {
+              ...order,
+              filledQty: order.filledQty + delta,
+              status: order.filledQty + delta === order.qty ? "filled" : "partially_filled"
+            } 
             order.filledQty += delta;
             filledQty += delta;
             break;
@@ -391,6 +417,7 @@ export function matchAlgorithm(order: Order) {
         }
 
         if(orders.length === 0) {
+          ORDERBOOKS.get(symbol)?.bids.delete(bidPrice);
           continue;
         }
 
@@ -411,7 +438,7 @@ export function matchAlgorithm(order: Order) {
           const matchedOrders = Math.min(order.qty, delta);
 
           if(order.qty <= delta){
-            let AggreatedOrders = priceAggregate.get(price)?? priceAggregate.set(price, [] ).get(price)!;
+            let AggreatedOrders = priceAggregate.get(bidPrice)?? priceAggregate.set(bidPrice, [] ).get(bidPrice)!;
             AggreatedOrders.push({
               matchedOrders: matchedOrders,
               totalOrderQty: order.qty,
@@ -423,10 +450,17 @@ export function matchAlgorithm(order: Order) {
             filledQty += matchedOrders;
             order.status = "filled";
             
-            orders.slice(i, 1);
+            const orderstoUpdate = ORDERBOOKS.get(symbol)!.bids.get(bidPrice)!;
+            const idx = orderstoUpdate.findIndex((o) => o.orderId === order.orderId);
+            if (idx !== -1) {
+              orderstoUpdate.splice(idx, 1);
+            }
+            if(orderstoUpdate.length === 0) {
+              ORDERBOOKS.get(symbol)?.bids.delete(bidPrice);
+            }
             
           }else {
-            let AggreatedOrders = priceAggregate.get(price)?? priceAggregate.set(price, [] ).get(price)!;
+            let AggreatedOrders = priceAggregate.get(bidPrice)?? priceAggregate.set(bidPrice, [] ).get(bidPrice)!;
             AggreatedOrders.push({
               matchedOrders: delta,
               totalOrderQty: order.qty,
