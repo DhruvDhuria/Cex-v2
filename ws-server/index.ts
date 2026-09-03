@@ -7,7 +7,7 @@ await ReaderClient.connect()
 const streamState = [
     { key: "depthStream", id: "$" },
     { key: "booktickerStream", id: "$"},
-    { key: "tradesStream", id: "$"}
+    { key: "aggtradesStream", id: "$"}
 ]
 
 const activeSubscriptions: Record<string, Websocket[]> = {};
@@ -27,10 +27,12 @@ async function startReadingStream() {
         if (response) {
         // Response format: [{ name: "streamKey", messages: [{ id: "...", message: {...} }] }]
         for (const stream of response) {
-            const streamName = stream.name;
+            const streamName:
+              | "depthStream"
+              | "booktickerStream"
+              | "aggtradesStream" = stream.name;
           for (const event of stream.messages) {
-            console.log(`Received Event [${event.id}]:`, event.message);
-            let updateName;
+            let updateName: string;
             if(streamName === "depthStream") {
                 const symbol = event.message.market
                 updateName = `depth.${symbol.toUpperCase()}_USD`
@@ -38,7 +40,7 @@ async function startReadingStream() {
             }else if(streamName === "booktickerStream") {
                 const symbol = event.message.market
                 updateName = `bookticker.${symbol.toUpperCase()}_USD`
-            }else  {
+            }else { 
                 const symbol = event.message.market
                 updateName = `trades.${symbol.toUpperCase()}_USD`
             }
@@ -84,7 +86,6 @@ wss.on("connection", (ws) => {
             const parsedData = JSON.parse(message.toString());
 
             if (parsedData.method === "SUBSCRIBE") {
-              console.log("ws subscribe", parsedData)
               parsedData.params.forEach((params: any) => {
                 if (!activeSubscriptions[params]) {
                   activeSubscriptions[params] = [];
@@ -94,7 +95,6 @@ wss.on("connection", (ws) => {
                 }
               });
             } else if (parsedData.method === "UNSUBSCRIBE") {
-              console.log("ws subscribe", parsedData);
               parsedData.params.forEach((param: any) => {
                 if (!activeSubscriptions[param]) {
                   activeSubscriptions[param] = [];

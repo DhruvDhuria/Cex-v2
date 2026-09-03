@@ -121,13 +121,16 @@ export function matchAlgorithm(order: Order) {
           if(!seller) {
             continue;
           }
-          const matchedOrders = Math.min(order.qty, delta);
 
-          if(order.qty <= delta){
+          const orderQty = order.qty - order.filledQty;
+          const matchedOrders = Math.min(orderQty, delta);
+          const totalOrderQty = orders.reduce((acc, curr) => acc + (curr.qty - curr.filledQty), 0)
+
+          if(orderQty <= delta){
             let AggreatedOrders = priceAggregate.get(askPrice)?? priceAggregate.set(askPrice, [] ).get(askPrice)!;
             AggreatedOrders.push({
               matchedOrders: matchedOrders,
-              totalOrderQty: orders.length,
+              totalOrderQty: totalOrderQty,
               matchedUser: sellerId,
               orderId: order.orderId,
               side
@@ -149,7 +152,7 @@ export function matchAlgorithm(order: Order) {
             let AggreatedOrders = priceAggregate.get(askPrice)?? priceAggregate.set(askPrice, [] ).get(askPrice)!;
             AggreatedOrders.push({
               matchedOrders: delta,
-              totalOrderQty: orders.length,
+              totalOrderQty: totalOrderQty,
               matchedUser: sellerId,
               orderId: order.orderId,
               side
@@ -216,13 +219,15 @@ export function matchAlgorithm(order: Order) {
           if(!buyer) {
             continue;
           }
-          const matchedOrders = Math.min(order.qty, delta);
+          const orderQty = order.qty - order.filledQty;
+          const matchedOrders = Math.min(orderQty, delta);
+          const totalOrderQty = orders.reduce((acc, curr) => acc + (curr.qty - curr.filledQty), 0)
 
-          if(order.qty <= delta){
+          if(orderQty <= delta){
             let AggreatedOrders = priceAggregate.get(bidPrice)?? priceAggregate.set(bidPrice, [] ).get(bidPrice)!;
             AggreatedOrders.push({
               matchedOrders: matchedOrders,
-              totalOrderQty: orders.length,
+              totalOrderQty: totalOrderQty,
               matchedUser: buyerId,
               orderId: order.orderId,
               side
@@ -243,7 +248,7 @@ export function matchAlgorithm(order: Order) {
             let AggreatedOrders = priceAggregate.get(bidPrice)?? priceAggregate.set(bidPrice, [] ).get(bidPrice)!;
             AggreatedOrders.push({
               matchedOrders: delta,
-              totalOrderQty: orders.length,
+              totalOrderQty: totalOrderQty,
               matchedUser: buyerId,
               orderId: order.orderId,
               side
@@ -321,13 +326,15 @@ export function matchAlgorithm(order: Order) {
           if(!seller) {
             continue;
           }
-          const matchedOrders = Math.min(order.qty, delta);
+          const orderQty = order.qty - order.filledQty;
+          const matchedOrders = Math.min(orderQty, delta);
+          const totalOrderQty = orders.reduce((acc, curr) => acc + (curr.qty - curr.filledQty), 0)
 
-          if(order.qty <= delta){
+          if(orderQty <= delta){
             let AggreatedOrders = priceAggregate.get(askPrice)?? priceAggregate.set(askPrice, [] ).get(askPrice)!;
             AggreatedOrders.push({
               matchedOrders: matchedOrders,
-              totalOrderQty: orders.length,
+              totalOrderQty: totalOrderQty,
               matchedUser: sellerId,
               orderId: order.orderId,
               side
@@ -349,7 +356,7 @@ export function matchAlgorithm(order: Order) {
             let AggreatedOrders = priceAggregate.get(askPrice)?? priceAggregate.set(askPrice, [] ).get(askPrice)!;
             AggreatedOrders.push({
               matchedOrders: delta,
-              totalOrderQty: orders.length,
+              totalOrderQty: totalOrderQty,
               matchedUser: sellerId,
               orderId: order.orderId,
               side
@@ -435,13 +442,15 @@ export function matchAlgorithm(order: Order) {
           if(!buyer) {
             continue;
           }
-          const matchedOrders = Math.min(order.qty, delta);
+          const orderQty = order.qty - order.filledQty;
+          const matchedOrders = Math.min(orderQty, delta);
+          const totalOrderQty = orders.reduce((acc, curr) => acc + (curr.qty - curr.filledQty), 0)
 
-          if(order.qty <= delta){
+          if(orderQty <= delta){
             let AggreatedOrders = priceAggregate.get(bidPrice)?? priceAggregate.set(bidPrice, [] ).get(bidPrice)!;
             AggreatedOrders.push({
               matchedOrders: matchedOrders,
-              totalOrderQty: order.qty,
+              totalOrderQty: totalOrderQty,
               matchedUser: buyerId,
               orderId: order.orderId,
               side
@@ -463,7 +472,7 @@ export function matchAlgorithm(order: Order) {
             let AggreatedOrders = priceAggregate.get(bidPrice)?? priceAggregate.set(bidPrice, [] ).get(bidPrice)!;
             AggreatedOrders.push({
               matchedOrders: delta,
-              totalOrderQty: order.qty,
+              totalOrderQty: totalOrderQty,
               matchedUser: buyerId,
               orderId: order.orderId,
               side

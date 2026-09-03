@@ -169,16 +169,21 @@ function handleEngineRequest(message: EngineRequest): unknown {
       asks: [],
       bids: []
     }
+    const user = BALANCES.get(order.userId)
+    if(!user) {
+      return {
+        error: "User not found"
+      }
+    }
     result.priceAggregate?.forEach((fills: AggregateFill[], pricekey: number) => {
       let delta = 0;
       fills.forEach((item: any) => {
         const totalQty = item.totalOrderQty;
         delta = totalQty - item.matchedOrders;
-        const user = BALANCES.get(order.userId)
         const matchedUser = BALANCES.get(item.matchedUser)
 
-        if(!user || !matchedUser) {
-          return "either user or matched user not found"
+        if(!matchedUser) {
+          return "Error: matched user not found"
         }
         // set default balances if they don't exist to 0 so that we don't get undefined errors when updating balances
         user.usd = user.usd || { available: 0, locked: 0 };
@@ -206,6 +211,7 @@ function handleEngineRequest(message: EngineRequest): unknown {
         publishToStream(order.symbol ,tradeUpdate, "TradesUpdate")
 
       })
+
       if(fills[0]!.side === "buy") {
         depthUpdates.asks.push({
           levelprice: pricekey,
@@ -220,6 +226,11 @@ function handleEngineRequest(message: EngineRequest): unknown {
 
 
     })
+    
+    if(result.orderStatus === "filled") {
+      user.usd!.available += user.usd?.locked || 0;
+      user.usd!.locked = 0;
+    }
 
     const averagePrice =
       Array.from(result.priceAggregate!.entries()).reduce(
@@ -254,7 +265,6 @@ function handleEngineRequest(message: EngineRequest): unknown {
 
     publishToStream(order.symbol, depthUpdates, "depthUpdate")
 
-    console.log(result.priceAggregate, "inthe price aggregate")
     const fills: Fill[] = Array.from(
       result.priceAggregate?.entries() || [],
     ).flatMap(([priceKey, items]) => {
@@ -300,13 +310,13 @@ function handleEngineRequest(message: EngineRequest): unknown {
 
     const asks: {price: number, qty: number}[] = []
     ORDERBOOKS.get(message.payload.symbol)?.asks.forEach(( order, price) => {
-      const qty = order.reduce((acc, item) => acc + item.qty, 0)
+      const qty = order.reduce((acc, item) => acc + ( item.qty - item.filledQty), 0)
       asks.push({price: price, qty})
     })
 
     const bids: {price: number, qty: number}[] = []
     ORDERBOOKS.get(message.payload.symbol)?.bids.forEach((order, price) => {
-      const qty = order.reduce((acc, item) => acc + item.qty, 0)
+      const qty = order.reduce((acc, item) => acc + (item.qty - item.filledQty), 0)
       bids.push({price: price, qty})
     })
           
@@ -400,8 +410,6 @@ function handleEngineRequest(message: EngineRequest): unknown {
     const {symbol, amount, userId} = message.payload
 
     let balance = BALANCES.get(userId)
-
-    console.log(message.payload.userId, BALANCES)
 
     if(!balance) {
       BALANCES.set(userId, {})
