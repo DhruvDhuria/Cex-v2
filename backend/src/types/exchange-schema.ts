@@ -28,3 +28,7 @@ export const addBalanceBodySchema = z.object({
   amount: z.number().positive(),
   symbol: z.string().trim().min(1, "symbol is required") 
 });
+export const withdrawBalanceBodySchema = z.object({
+  amount: z.number().positive(),
+  symbol: z.string().trim().min(1, "symbol is required"),
+});

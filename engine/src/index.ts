@@ -1,9 +1,9 @@
 import "dotenv/config";
 import {  createClient } from "redis";
 import { env } from "./utils/env.js";
-import { matchAlgorithm, type Order } from "./utils/matchAlgorithm.js";
+import { matchAlgorithm, type Order } from "./utils/matchAlgorithmOptimized.ts";
 import { BALANCES, ORDERBOOKS, ORDERS, type Fill, type OrderType, type Side } from "./store/exchange-store.js";
-import { type AggregateFill } from "./utils/matchAlgorithm.js";
+import { type AggregateFill } from "./utils/matchAlgorithmOptimized.ts";
 import { publishToStream } from "./streams.js";
 
 const assets = ["BTC", "ETH", "SOL"]
@@ -22,7 +22,8 @@ export type EngineCommandType =
   | "get_user_balance"
   | "get_order"
   | "cancel_order"
-  | "add_balance";
+  | "add_balance"
+  | "withdraw_balance";
 
 export interface EngineRequest {
   correlationId: string;
@@ -99,7 +100,7 @@ function isId<K extends string>(
   let value: string;
   if (requestType === "get_order" || requestType === "cancel_order") {
     value = "orderId";
-  } else if (requestType === "get_user_balance" || requestType === "add_balance") {
+  } else if (requestType === "get_user_balance" || requestType === "add_balance" || requestType === "withdraw_balance") {
     value = "userId";
   } else {
     value = "symbol";
@@ -431,6 +432,44 @@ function handleEngineRequest(message: EngineRequest): unknown {
 
     balance[symbol].available += amount
  
+    return {
+      balance
+    }
+
+  } else if(message.type === "withdraw_balance") {
+    if(!isId(message.payload, message.type)) {
+      return {
+        error: "invalid userId"
+      }
+    }
+    if(!isAddBalanceRequest(message.payload)) {
+      return {
+        error: "invalid payload"
+      }
+    }
+    const {symbol, amount, userId} = message.payload
+
+    const balance = BALANCES.get(userId)
+    if(!balance) {
+      return {
+        error: "user not found"
+      }
+    }
+
+    if(!balance[symbol]) {
+      return {
+        error: "insufficient balance"
+      }
+    }
+
+    if(balance[symbol].available < amount) {
+      return {
+        error: "insufficient balance"
+      }
+    }
+
+    balance[symbol].available -= amount
+
     return {
       balance
     }

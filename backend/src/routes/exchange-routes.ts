@@ -5,7 +5,8 @@ import {
   getBalance,
   getDepth,
   getOrder,
-  addBalance
+  addBalance,
+  withdrawBalance
 } from "../controllers/exchange-controller.js";
 import { requireAuth } from "../utils/auth.js";
 import { asyncHandler } from "../utils/async-handler.js";
@@ -16,5 +17,6 @@ exchangeRouter.post("/order", requireAuth, asyncHandler(createOrder));
 exchangeRouter.get("/depth/:symbol", requireAuth, asyncHandler(getDepth));
 exchangeRouter.get("/balance", requireAuth, asyncHandler(getBalance));
 exchangeRouter.post('/balance', requireAuth, asyncHandler(addBalance));
+exchangeRouter.post('/balance/withdraw', requireAuth, asyncHandler(withdrawBalance));
 exchangeRouter.get("/order/:orderId", requireAuth, asyncHandler(getOrder));
 exchangeRouter.delete("/order/:orderId", requireAuth, asyncHandler(cancelOrder));

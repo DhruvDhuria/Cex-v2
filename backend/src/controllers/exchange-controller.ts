@@ -4,6 +4,7 @@ import {
   orderBodySchema,
   orderIdParamSchema,
   symbolParamSchema,
+  withdrawBalanceBodySchema,
 } from "../types/exchange-schema.js";
 import { sendToEngine } from "../utils/engine-client.js";
 import { sendValidationError } from "../utils/validation.js";
@@ -109,6 +110,24 @@ export async function addBalance(req: Request, res: Response): Promise<void> {
 
   const { symbol, amount } = parsedBody.data;
   const engineResponse = await sendToEngine("add_balance", {
+    userId: getUserId(req),
+    symbol,
+    amount,
+  });
+  res.status(engineResponse.ok ? 200 : 400).json(engineResponse.ok ? engineResponse.data : {
+    error: engineResponse.error,
+  });
+}
+
+export async function withdrawBalance(req: Request, res: Response): Promise<void> {
+  const parsedBody = withdrawBalanceBodySchema.safeParse(req.body);
+  if (!parsedBody.success) {
+    sendValidationError(res, parsedBody.error);
+    return;
+  }
+
+  const { symbol, amount } = parsedBody.data;
+  const engineResponse = await sendToEngine("withdraw_balance", {
     userId: getUserId(req),
     symbol,
     amount,

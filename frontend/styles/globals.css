@@ -3,6 +3,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@utility scrollbar-none {
+  scrollbar-width: none;                 /* Firefox */
+  &::-webkit-scrollbar {
+    display: none;                       /* Safari and Chrome */
+  }
+}
+
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
