@@ -2,12 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { api, setToken } from "@/lib/api";
 
 function Signin() {
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -15,7 +17,7 @@ function Signin() {
     try {
       const response = await api.post<{ token: string }>("/signin", { username, password });
       setToken(response.data.token);
-      window.location.reload();
+      navigate("/trade");
     } catch (err) {
       setError(
         (err as { response?: { data?: { error?: string } } }).response?.data?.error ?? "Signin failed",

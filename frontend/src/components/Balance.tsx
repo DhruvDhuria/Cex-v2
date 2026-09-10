@@ -23,10 +23,10 @@ import {
 
 type Mode = "add" | "withdraw";
 
-export default function Balance() {
+export default function Balance({ initialMode = "add" }: { initialMode?: Mode }) {
   const [balances, setBalances] = React.useState<Balances>({});
   const [loadingBalances, setLoadingBalances] = React.useState(true);
-  const [mode, setMode] = React.useState<Mode>("add");
+  const [mode, setMode] = React.useState<Mode>(initialMode);
   const [asset, setAsset] = React.useState<FundingAsset>("usd");
   const [amount, setAmount] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
