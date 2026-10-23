@@ -1,126 +1,209 @@
+// import "dotenv/config";
 import Websocket, { WebSocketServer } from "ws";
-import {createClient } from "redis";
+import { createClient } from "redis";
+import { TickerManager, type TickerPayload } from "./utils/tickerManager.ts";
 
-const ReaderClient = createClient().on("error", error => console.error("redis error",))
-await ReaderClient.connect()
+const REDIS_URL = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
 
-const streamState = [
-    { key: "depthStream", id: "$" },
-    { key: "booktickerStream", id: "$"},
-    { key: "aggtradesStream", id: "$"}
-]
-
-const activeSubscriptions: Record<string, Websocket[]> = {};
-
-async function startReadingStream() {
-    console.log("Stream loop started...")
-
-    while(true) {
-       try {
-        const response = await ReaderClient.xRead(
-          streamState,
-          {
-            COUNT: 1,
-            BLOCK: 0,
-          },
-        );
-        if (response) {
-        // Response format: [{ name: "streamKey", messages: [{ id: "...", message: {...} }] }]
-        for (const stream of response) {
-            const streamName:
-              | "depthStream"
-              | "booktickerStream"
-              | "aggtradesStream" = stream.name;
-          for (const event of stream.messages) {
-            let updateName: string;
-            if(streamName === "depthStream") {
-                const symbol = event.message.market
-                updateName = `depth.${symbol.toUpperCase()}_USD`
-                
-            }else if(streamName === "booktickerStream") {
-                const symbol = event.message.market
-                updateName = `bookticker.${symbol.toUpperCase()}_USD`
-            }else { 
-                const symbol = event.message.market
-                updateName = `trades.${symbol.toUpperCase()}_USD`
-            }
-            
-
-            const payload = JSON.stringify({stream: updateName, data: event.message.data})
-            
-            // Send data to all subscribers
-            const subscribers = activeSubscriptions[updateName]
-            if(subscribers && subscribers.length > 0) {
-                subscribers.forEach((ws) => {
-                    if(ws.readyState === Websocket.OPEN) {
-                        ws.send(payload)
-                    }
-                })
-            }
-
-            const stateItem = streamState.find((item) => item.key === streamName);
-            if (stateItem) {
-              stateItem.id = event.id;
-            }
-
-          }
-        }
-      }
-       } catch (error) {
-        console.error("Stream read error:", error);
-      // Short delay before retrying to prevent CPU melting if Redis connection drops
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-       } 
-    }
+/**
+ * Channel keys are `<kind>.<SYMBOL>_USD`.
+ * `kind` is always lowercase, the pair is always uppercase.
+ * Subscribe and broadcast MUST both go through this function — a mismatch
+ * silently delivers nothing to the client.
+ */
+function normalizeChannel(channel: string): string {
+  const [kind, pair] = channel.split(".");
+  if (!kind || !pair) return channel;
+  return `${kind.toLowerCase()}.${pair.toUpperCase()}`;
 }
 
-startReadingStream()
+// Active client subscriptions mapping: e.g., { "ticker.BTC_USD": [ws, ws] }
+const activeSubscriptions: Record<string, Websocket[]> = {};
+
+// Local registry of TickerManager instances, one per market pair
+const tickerRegistry: Map<string, TickerManager> = new Map();
+
+/** Sockets that answered the last heartbeat ping. */
+const alive = new WeakSet<Websocket>();
+
+function broadcastToSubscribers(channelName: string, payload: string) {
+  const subscribers = activeSubscriptions[normalizeChannel(channelName)];
+  if (!subscribers || subscribers.length === 0) return;
+
+  subscribers.forEach((ws) => {
+    if (ws.readyState === Websocket.OPEN) {
+      ws.send(payload);
+      console.log(`Broadcasted to ${channelName}: ${payload}`);
+    }
+  });
+}
+
+function handleDepthEvent(message: Record<string, string>) {
+  const symbol = message.market;
+  if (!symbol) return;
+
+  const updateName = normalizeChannel(`depth.${symbol}_USD`);
+
+  const payload = JSON.stringify({
+    stream: updateName,
+    data: message.data,
+  });
+  broadcastToSubscribers(updateName, payload);
+}
+
+function handleTradesEvent(message: Record<string, string>) {
+  const symbol = message.market;
+  if (!symbol) return;
+
+  const normalizedMarket = `${symbol.toUpperCase()}_USD`;
+
+  // raw trades
+  const updateName = normalizeChannel(`trades.${normalizedMarket}`);
+  const rawTradePayload = JSON.stringify({
+    stream: updateName,
+    data: message.data,
+  });
+  broadcastToSubscribers(updateName, rawTradePayload);
+
+  // --- TICKER ENGINE INTEGRATION ---
+  // message.data is a JSON string published by the engine, parse it first
+  if (typeof message.data !== "string") return;
+  let trade: { price?: unknown; qty?: unknown };
+  try {
+    trade = JSON.parse(message.data);
+  } catch {
+    return;
+  }
+
+  const tradePrice = parseFloat(String(trade.price));
+  const tradeQty = parseFloat(String(trade.qty));
+  if (isNaN(tradePrice) || isNaN(tradeQty)) return;
+
+  if (!tickerRegistry.has(normalizedMarket)) {
+    tickerRegistry.set(normalizedMarket, new TickerManager());
+  }
+  const manager = tickerRegistry.get(normalizedMarket)!;
+
+  const updated24hTicker: TickerPayload = manager.update(tradePrice, tradeQty);
+
+  const tickerChannelName = normalizeChannel(`ticker.${normalizedMarket}`);
+  const tickerPayload = JSON.stringify({
+    stream: tickerChannelName,
+    // `data` is always a JSON string so clients parse it exactly once
+    data: JSON.stringify(updated24hTicker),
+  });
+  broadcastToSubscribers(tickerChannelName, tickerPayload);
+}
+
+/**
+ * Reads one Redis stream forever with its own cursor.
+ *
+ * Each stream gets an independent blocking read so a busy stream can never
+ * starve the other one, and each cursor only ever moves forward — an entry
+ * published while the reader was blocked on another stream is never skipped.
+ */
+async function readStreamForever(
+  key: string,
+  onEvent: (message: Record<string, string>) => void,
+) {
+  // Each stream needs its own connection: a blocking XREAD holds the socket
+  // until it returns, so sharing one client makes the second read wait forever.
+  const reader = createClient({ url: REDIS_URL }).on("error", (error) =>
+    console.error(`redis error (${key})`, error),
+  );
+  await reader.connect();
+
+  let lastId = "$";
+
+  for (;;) {
+    try {
+      const response = await reader.xRead([{ key, id: lastId }], {
+        COUNT: 50,
+        BLOCK: 0,
+      });
+      if (!response) continue;
+
+      for (const stream of response) {
+        for (const event of stream.messages) {
+          lastId = event.id;
+          onEvent(event.message as Record<string, string>);
+        }
+      }
+    } catch (error) {
+      console.error(`Stream read error (${key}):`, error);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+}
+
+console.log("Stream loop started...");
+void readStreamForever("depthStream", handleDepthEvent);
+void readStreamForever("aggtradesStream", handleTradesEvent);
 
 const wss = new WebSocketServer({ port: 8080 });
 
+// Reap sockets that stopped answering pings (half-open connections).
+// const heartbeat = setInterval(() => {
+//   for (const client of wss.clients) {
+//     if (!alive.has(client)) {
+//       client.terminate();
+//       continue;
+//     }
+//     alive.delete(client);
+//     client.ping();
+//   }
+// }, 30_000);
+// wss.on("close", () => clearInterval(heartbeat));
 
 wss.on("connection", (ws) => {
-    ws.on("message", (message) => {
-        //examples params: depth.BTC_USDC, bookticker.BTC_USDC, trades.BTC_USDC
-        try {
-            const parsedData = JSON.parse(message.toString());
+  alive.add(ws);
+  ws.on("pong", () => alive.add(ws));
 
-            if (parsedData.method === "SUBSCRIBE") {
-              parsedData.params.forEach((params: any) => {
-                if (!activeSubscriptions[params]) {
-                  activeSubscriptions[params] = [];
-                }
-                if (!activeSubscriptions[params].includes(ws)) {
-                  activeSubscriptions[params].push(ws);
-                }
-              });
-            } else if (parsedData.method === "UNSUBSCRIBE") {
-              parsedData.params.forEach((param: any) => {
-                if (!activeSubscriptions[param]) {
-                  activeSubscriptions[param] = [];
-                } else {
-                  const index = activeSubscriptions[param].indexOf(ws);
-                  if (index > -1) {
-                    activeSubscriptions[param] = activeSubscriptions[
-                      param
-                    ].filter((x) => x !== ws);
-                  }
-                }
-              });
-            }
-        } catch (error) {
-            console.error("Error processing WS message:", error);
-        }
-    });
-    ws.on('close', () => {
-        Object.keys(activeSubscriptions).forEach((param) => {
-          activeSubscriptions[param] = activeSubscriptions[param]!.filter(
-            (client) => client !== ws
-          );
-          if (activeSubscriptions[param].length === 0) {
-            delete activeSubscriptions[param];
+  ws.on("message", (message) => {
+    // Handled params structural examples: depth.BTC_USD, trades.BTC_USD, ticker.BTC_USD
+    try {
+      const parsedData = JSON.parse(message.toString());
+
+      if (parsedData.method === "SUBSCRIBE") {
+        parsedData.params.forEach((param: string) => {
+          const normalizedParam = normalizeChannel(param);
+          if (!activeSubscriptions[normalizedParam]) {
+            activeSubscriptions[normalizedParam] = [];
+          }
+          if (!activeSubscriptions[normalizedParam].includes(ws)) {
+            activeSubscriptions[normalizedParam].push(ws);
           }
         });
-    })
-});
+      } else if (parsedData.method === "UNSUBSCRIBE") {
+        parsedData.params.forEach((param: string) => {
+          const normalizedParam = normalizeChannel(param);
+          if (activeSubscriptions[normalizedParam]) {
+            activeSubscriptions[normalizedParam] = activeSubscriptions[
+              normalizedParam
+            ].filter((x) => x !== ws);
+            if (activeSubscriptions[normalizedParam].length === 0) {
+              delete activeSubscriptions[normalizedParam];
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Error processing WS message:", error);
+    }
+  });
 
+  ws.on("error", (error) => {
+    console.error("WebSocket error:", error);
+  });
+
+  ws.on("close", () => {
+    Object.keys(activeSubscriptions).forEach((param) => {
+      activeSubscriptions[param] = activeSubscriptions[param]!.filter(
+        (client) => client !== ws,
+      );
+      if (activeSubscriptions[param].length === 0) {
+        delete activeSubscriptions[param];
+      }
+    });
+  });
+});
