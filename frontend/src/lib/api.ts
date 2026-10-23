@@ -17,7 +17,10 @@ export function quotePair(symbol: string): string {
   return `${symbol}_USD`;
 }
 
-export function wsChannel(symbol: string, kind: "depth" | "trades" | "bookticker"): string {
+/** Channels published by the ws-server. */
+export type WsChannelKind = "depth" | "trades" | "ticker";
+
+export function wsChannel(symbol: string, kind: WsChannelKind): string {
   return `${kind}.${quotePair(symbol)}`;
 }
 
@@ -36,6 +39,21 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// An expired / invalid token must not leave the UI in a "signed in" state
+// where every request silently fails.
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      clearToken();
+      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/sign")) {
+        window.location.assign("/signin");
+      }
+    }
+    return Promise.reject(error);
+  },
+);
 
 export function getToken(): string | null {
   return typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_KEY) : null;
