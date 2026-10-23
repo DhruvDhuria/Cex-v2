@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useRef, useEffect, useState} from "react";
 import {
   CandlestickSeries,
   ColorType,
@@ -20,25 +20,32 @@ import {
   type CandleInterval,
 } from "@/hooks/useCandles";
 import { quotePair } from "@/lib/api";
+import type { SubscribeToTrades } from "@/hooks/useMarketData";
 import { Panel } from "./Panel";
 
 const UP_COLOR = "#26a69a";
 const DOWN_COLOR = "#ef5350";
 
-export default function Chart({ symbol }: { symbol: string }) {
-  const [interval, setInterval] = React.useState<CandleInterval>("1s");
-  const { candles, volumes } = useCandles(symbol, interval);
+function Chart({
+  symbol,
+  subscribeToTrades,
+}: {
+  symbol: string;
+  subscribeToTrades: SubscribeToTrades;
+}) {
+  const [interval, setInterval] = useState<CandleInterval>("1s");
+  const { candles, volumes } = useCandles(symbol, interval, subscribeToTrades);
 
-  const containerRef = React.useRef<HTMLDivElement | null>(null);
-  const chartRef = React.useRef<IChartApi | null>(null);
-  const candleSeriesRef = React.useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const volumeSeriesRef = React.useRef<ISeriesApi<"Histogram"> | null>(null);
-  const watermarkRef = React.useRef<ITextWatermarkPluginApi<Time> | null>(null);
-  const watermarkVisibleRef = React.useRef(false);
-  const hasDataRef = React.useRef(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const watermarkRef = useRef<ITextWatermarkPluginApi<Time> | null>(null);
+  const watermarkVisibleRef = useRef(false);
+  const hasDataRef = useRef(false);
 
   // Create the chart once; destroy on unmount.
-  React.useEffect(() => {
+  useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -163,7 +170,7 @@ export default function Chart({ symbol }: { symbol: string }) {
         </Tabs>
       }
     >
-      <div ref={containerRef} className="min-h-[320px] w-full flex-1" />
+      <div ref={containerRef} className="min-h-80 w-full flex-1" />
       <div className="num flex items-center justify-between border-t border-hairline px-3 py-1.5 text-[10px] text-muted-foreground">
         <span>
           {candles.length > 0
@@ -180,3 +187,5 @@ export default function Chart({ symbol }: { symbol: string }) {
     </Panel>
   );
 }
+
+export default React.memo(Chart);

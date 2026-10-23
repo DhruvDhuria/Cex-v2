@@ -1,6 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { useTrades } from "@/hooks/useTrades";
+import type { Trade } from "@/hooks/useMarketData";
 import { Panel } from "./Panel";
 import { formatNumber } from "./format";
 
@@ -10,11 +10,9 @@ function formatTime(ts: number): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-export default function Trades({ symbol }: { symbol: string }) {
-  const { trades } = useTrades(symbol);
-
+export default function Trades({ trades }: { trades: Trade[] }) {
   return (
-    <Panel title="Trades" className="min-w-64 max-w-75" bodyClassName="flex flex-col">
+    <Panel title="Trades" className="min-w-64 max-w-80" bodyClassName="flex flex-col">
       <div className="grid grid-cols-3 px-3 py-1.5 text-right text-[10px] tracking-wide text-muted-foreground uppercase">
         <span className="text-left">Price</span>
         <span>Size</span>

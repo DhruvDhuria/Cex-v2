@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type {
   CandlestickData,
   HistogramData,
   UTCTimestamp,
 } from "lightweight-charts";
-import { wsChannel } from "@/lib/api";
-import { useWebSocket } from "@/lib/useWebSocket";
+import type { TradePayload } from "@/lib/streamPayloads";
+import type { SubscribeToTrades } from "@/hooks/useMarketData";
 
 export type CandleInterval = "1s" | "1m" | "5m";
 
@@ -84,11 +84,6 @@ interface Bar {
   volume: number;
 }
 
-interface TradePayload {
-  price: number;
-  qty: number;
-}
-
 /**
  * Aggregates the live `trades.*` websocket stream into OHLCV candles.
  * Buckets are UTCTimestamps in seconds; arrays stay ascending with unique times.
@@ -96,21 +91,18 @@ interface TradePayload {
 export function useCandles(
   symbol: string,
   interval: CandleInterval,
+  subscribeToTrades: SubscribeToTrades,
 ): {
   candles: CandlestickData<UTCTimestamp>[];
   volumes: HistogramData<UTCTimestamp>[];
 } {
-  const { messages } = useWebSocket([wsChannel(symbol, "trades")]);
-
-  const [candles, setCandles] = React.useState<CandlestickData<UTCTimestamp>[]>([]);
-  const [volumes, setVolumes] = React.useState<HistogramData<UTCTimestamp>[]>([]);
-  const barsRef = React.useRef(new Map<number, Bar>());
-  const lastBucketRef = React.useRef<number | null>(null);
-
-  const lastMessageJson = JSON.stringify(messages[messages.length - 1]);
+  const [candles, setCandles] = useState<CandlestickData<UTCTimestamp>[]>([]);
+  const [volumes, setVolumes] = useState<HistogramData<UTCTimestamp>[]>([]);
+  const barsRef = useRef(new Map<number, Bar>());
+  const lastBucketRef = useRef<number | null>(null);
 
   // Reset aggregation when symbol or interval changes (reseeds dummy history).
-  React.useEffect(() => {
+  useEffect(() => {
     const seed = buildSeedBars(symbol, interval);
     barsRef.current = seed;
     const buckets = [...seed.keys()];
@@ -120,48 +112,45 @@ export function useCandles(
     setVolumes(series.volumes);
   }, [symbol, interval]);
 
-  React.useEffect(() => {
-    const last = messages[messages.length - 1];
-    if (!last || last.stream !== wsChannel(symbol, "trades")) return;
+  const handleTrade = React.useCallback(
+    (data: TradePayload) => {
+      if (!(data.price > 0) || !(data.qty > 0)) return;
 
-    let data: TradePayload;
-    try {
-      data = JSON.parse(last.raw) as TradePayload;
-    } catch {
-      return;
-    }
-    if (typeof data.price !== "number" || typeof data.qty !== "number") return;
-    if (!(data.price > 0) || !(data.qty > 0)) return;
+      const bucket =
+        Math.floor(
+          Math.floor(Date.now() / 1000) / INTERVAL_SECONDS[interval],
+        ) * INTERVAL_SECONDS[interval];
 
-    const bucket =
-      Math.floor(
-        Math.floor(Date.now() / 1000) / INTERVAL_SECONDS[interval],
-      ) * INTERVAL_SECONDS[interval];
+      const existing = barsRef.current.get(bucket);
+      if (existing) {
+        existing.high = Math.max(existing.high, data.price);
+        existing.low = Math.min(existing.low, data.price);
+        existing.close = data.price;
+        existing.volume += data.qty;
+      } else {
+        // Drop late/out-of-order trades: series times must stay ascending.
+        if (lastBucketRef.current !== null && bucket < lastBucketRef.current) return;
+        barsRef.current.set(bucket, {
+          open: data.price,
+          high: data.price,
+          low: data.price,
+          close: data.price,
+          volume: data.qty,
+        });
+        lastBucketRef.current = bucket;
+      }
 
-    const existing = barsRef.current.get(bucket);
-    if (existing) {
-      existing.high = Math.max(existing.high, data.price);
-      existing.low = Math.min(existing.low, data.price);
-      existing.close = data.price;
-      existing.volume += data.qty;
-    } else {
-      // Drop late/out-of-order trades: series times must stay ascending.
-      if (lastBucketRef.current !== null && bucket < lastBucketRef.current) return;
-      barsRef.current.set(bucket, {
-        open: data.price,
-        high: data.price,
-        low: data.price,
-        close: data.price,
-        volume: data.qty,
-      });
-      lastBucketRef.current = bucket;
-    }
+      const next = toSeries(barsRef.current);
+      setCandles(next.candles);
+      setVolumes(next.volumes);
+    },
+    [interval],
+  );
 
-    const next = toSeries(barsRef.current);
-    setCandles(next.candles);
-    setVolumes(next.volumes);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastMessageJson]);
+  useEffect(
+    () => subscribeToTrades(handleTrade),
+    [subscribeToTrades, handleTrade],
+  );
 
   return { candles, volumes };
 }

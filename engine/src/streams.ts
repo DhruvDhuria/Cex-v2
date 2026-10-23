@@ -1,52 +1,49 @@
-import redis from 'redis'
-import {env} from "./utils/env.ts"
+import { commandClient } from "./redis.ts";
 
-const depthClient = redis.createClient({ url: env.redisUrl })
-depthClient.on("error", (error) => {
-    console.error("Redis depth client error", error);
-});
-const BookTickerClient = redis.createClient({ url: env.redisUrl })
-depthClient.on("error", (error) => {
-    console.error("Redis depth client error", error);
-});
-const AggTradesClient = redis.createClient({ url: env.redisUrl })
-depthClient.on("error", (error) => {
-    console.error("Redis depth client error", error);
-});
+export type StreamType = "depthUpdate" | "TradesUpdate";
 
-await Promise.all([depthClient.connect(), BookTickerClient.connect(), AggTradesClient.connect()])
+/** A single price level of the order book, as published on the depth stream. */
+export interface DepthLevelUpdate {
+  price: number;
+  qty: number;
+}
 
-export type StreamType = "depthUpdate" | "bookTickerUpdate" | "TradesUpdate"
+/**
+ * Depth stream payload.
+ *
+ * `qty` is the ABSOLUTE quantity resting at `price` after the update, not a
+ * signed delta. A level that was fully consumed is published with `qty: 0` so
+ * consumers can drop it.
+ */
+export interface DepthUpdates {
+  market: string;
+  asks: DepthLevelUpdate[];
+  bids: DepthLevelUpdate[];
+}
 
-export function publishToStream(market: string, data: any, type: StreamType) {
+/** Trade stream payload. */
+export interface TradeUpdate {
+  price: number;
+  qty: number;
+}
 
-    if(type === "depthUpdate") {
-        depthClient.xAdd(
-            `depthStream`,
-            "*",
-            {                   
-                market,
-                data: JSON.stringify(data)
-            }
-        )
-    }else if(type === "bookTickerUpdate"){ 
-        BookTickerClient.xAdd(
-            `booktickerStream`,
-            "*",
-            {   
-                market,
-                data: JSON.stringify(data)
-            }
-        )
-    }else {
-        AggTradesClient.xAdd(
-            `aggtradesStream`,
-            "*",
-            {
-                
-                market,
-                data: JSON.stringify(data)
-            }
-        )
-    }
+const STREAM_BY_TYPE: Record<StreamType, string> = {
+  depthUpdate: "depthStream",
+  TradesUpdate: "aggtradesStream",
+};
+
+export async function publishToStream(
+  market: string,
+  data: DepthUpdates | TradeUpdate,
+  type: StreamType,
+): Promise<void> {
+  try {
+    await commandClient.xAdd(STREAM_BY_TYPE[type], "*", {
+      market,
+      data: JSON.stringify(data),
+    });
+    console.log(`Published ${type} for ${market} ${JSON.stringify(data)}`);
+  } catch (error) {
+    console.error(`Failed to publish ${type} for ${market}`, error);
+  }
 }

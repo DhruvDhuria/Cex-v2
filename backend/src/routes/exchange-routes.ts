@@ -14,7 +14,8 @@ import { asyncHandler } from "../utils/async-handler.js";
 export const exchangeRouter = Router();
 
 exchangeRouter.post("/order", requireAuth, asyncHandler(createOrder));
-exchangeRouter.get("/depth/:symbol", requireAuth, asyncHandler(getDepth));
+// Market data is public: the orderbook is needed before signing in.
+exchangeRouter.get("/depth/:symbol", asyncHandler(getDepth));
 exchangeRouter.get("/balance", requireAuth, asyncHandler(getBalance));
 exchangeRouter.post('/balance', requireAuth, asyncHandler(addBalance));
 exchangeRouter.post('/balance/withdraw', requireAuth, asyncHandler(withdrawBalance));

@@ -15,7 +15,7 @@ import {
   type OrderType,
 } from "@/lib/api";
 
-export default function PlaceOrder({ symbol }: { symbol: string }) {
+function PlaceOrder({ symbol }: { symbol: string }) {
   const [type, setType] = React.useState<OrderType>("limit");
   const [side, setSide] = React.useState<OrderSide>("buy");
   const [price, setPrice] = React.useState("");
@@ -223,3 +223,5 @@ function Row({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+export default React.memo(PlaceOrder);

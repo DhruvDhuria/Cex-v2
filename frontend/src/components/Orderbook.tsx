@@ -26,8 +26,14 @@ function buildRows(levels: { price: number; qty: number }[]): Row[] {
   return rows;
 }
 
-export default function Orderbook({ symbol }: { symbol: string }) {
-  const { depth, loading, error } = useDepth(symbol);
+export default function Orderbook({
+  symbol,
+  lastPrice,
+}: {
+  symbol: string;
+  lastPrice: number | null;
+}) {
+  const { depth, loading, error } = useDepth(symbol, lastPrice);
   const [filter, setFilter] = React.useState<SideFilter>("both");
   const [hovered, setHovered] = React.useState<{ side: "bid" | "ask"; index: number } | null>(null);
 
@@ -80,7 +86,7 @@ export default function Orderbook({ symbol }: { symbol: string }) {
   return (
     <Panel
       title={quotePair(symbol)}
-      className="min-w-64 max-w-75"
+      className="min-w-64 max-w-80"
       bodyClassName="flex flex-col"
       actions={
         <div className="flex items-center rounded border border-hairline p-0.5">
@@ -116,10 +122,10 @@ export default function Orderbook({ symbol }: { symbol: string }) {
         <span>Total</span>
       </div>
 
-      {loading && <p className="px-3 py-2 text-xs text-muted-foreground">Loading…</p>}
+      {loading && !depth && <p className="px-3 py-2 text-xs text-muted-foreground">Loading…</p>}
       {error && <p className="px-3 py-2 text-xs text-destructive">{error}</p>}
 
-      {!loading && !error && (
+      {depth && (
         <div className="flex flex-1 flex-col justify-center">
           {askVisible && (
             <div className="flex max-h-50 flex-col overflow-y-auto scrollbar-none">

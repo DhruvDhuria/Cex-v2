@@ -53,6 +53,14 @@ export async function listenForEngineResponses(): Promise<void> {
 
     try {
       const parsedResponse = JSON.parse(response.element) as EngineResponse;
+      if (
+        !parsedResponse ||
+        typeof parsedResponse.correlationId !== "string" ||
+        typeof parsedResponse.ok !== "boolean"
+      ) {
+        console.error("Malformed engine response", response.element);
+        continue;
+      }
       resolveEngineResponse(parsedResponse);
     } catch (error) {
       console.error("Invalid engine response", error);
