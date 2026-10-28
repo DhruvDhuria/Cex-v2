@@ -4,14 +4,7 @@ import Orderbook from "@/components/Orderbook";
 import Trades from "@/components/Trades";
 import PlaceOrder from "@/components/PlaceOrder";
 import Ticker24h from "@/components/Ticker24h";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { SUPPORTED_SYMBOLS, type Symbol_ } from "@/lib/api";
+import { type Symbol_ } from "@/lib/api";
 import { useMarketData } from "@/hooks/useMarketData";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 type UpdateType = "Orderbook" | "Trades";
@@ -23,29 +16,14 @@ export default function Trade() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <div className="flex items-center justify-center">
-        <Select value={symbol} onValueChange={(v) => setSymbol(v as Symbol_)}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SUPPORTED_SYMBOLS.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex gap-4">
-        <div className="flex w-3/4 flex-col gap-4">
-          <Ticker24h symbol={symbol} />
-          <div className="flex h-[calc(100vh-14rem)] gap-4">
-            <div className="w-2/3 min-h-0">
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <Ticker24h symbol={symbol} onSymbolChange={setSymbol} />
+          <div className="flex h-[calc(100vh-14rem)] min-h-[400px] flex-col gap-4 lg:flex-row">
+            <div className="min-h-0 min-w-0 flex-1 lg:w-2/3">
               <Chart symbol={symbol} subscribeToTrades={subscribeToTrades} />
             </div>
-            <div className="flex h-full w-1/3 flex-col rounded-md border border-hairline bg-surface-raised p-3">
+            <div className="flex h-full min-h-0 w-full flex-col rounded-md border border-hairline bg-surface-raised p-3 lg:w-1/3">
               <Tabs
                 value={update}
                 onValueChange={(v) => setUpdate(v as UpdateType)}
@@ -63,7 +41,7 @@ export default function Trade() {
             </div>
           </div>
         </div>
-        <div className="flex h-full w-1/4 flex-col items-center justify-center gap">
+        <div className="flex w-full flex-col items-center justify-start lg:w-[320px] lg:flex-shrink-0">
           <PlaceOrder symbol={symbol} />
         </div>
       </div>

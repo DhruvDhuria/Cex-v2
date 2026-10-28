@@ -4,6 +4,7 @@ import { createClient } from "redis";
 import { TickerManager, type TickerPayload } from "./utils/tickerManager.ts";
 
 const REDIS_URL = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
+const MAX_TRADE_BUFFER = 50;
 
 /**
  * Channel keys are `<kind>.<SYMBOL>_USD`.
@@ -22,6 +23,7 @@ const activeSubscriptions: Record<string, Websocket[]> = {};
 
 // Local registry of TickerManager instances, one per market pair
 const tickerRegistry: Map<string, TickerManager> = new Map();
+const tradeBuffers: Map<string, Array<{ price: number; qty: number; ts: number }>> = new Map();
 
 /** Sockets that answered the last heartbeat ping. */
 const alive = new WeakSet<Websocket>();
@@ -57,14 +59,6 @@ function handleTradesEvent(message: Record<string, string>) {
 
   const normalizedMarket = `${symbol.toUpperCase()}_USD`;
 
-  // raw trades
-  const updateName = normalizeChannel(`trades.${normalizedMarket}`);
-  const rawTradePayload = JSON.stringify({
-    stream: updateName,
-    data: message.data,
-  });
-  broadcastToSubscribers(updateName, rawTradePayload);
-
   // --- TICKER ENGINE INTEGRATION ---
   // message.data is a JSON string published by the engine, parse it first
   if (typeof message.data !== "string") return;
@@ -85,6 +79,25 @@ function handleTradesEvent(message: Record<string, string>) {
   const manager = tickerRegistry.get(normalizedMarket)!;
 
   const updated24hTicker: TickerPayload = manager.update(tradePrice, tradeQty);
+
+  // raw trades
+  const updateName = normalizeChannel(`trades.${normalizedMarket}`);
+  const tradeWithTs = { price: tradePrice, qty: tradeQty, ts: Date.now() };
+  let buffer = tradeBuffers.get(normalizedMarket);
+  if (!buffer) {
+    buffer = [];
+    tradeBuffers.set(normalizedMarket, buffer);
+  }
+  buffer.unshift(tradeWithTs);
+  if (buffer.length > MAX_TRADE_BUFFER) {
+    buffer.length = MAX_TRADE_BUFFER;
+  }
+
+  const rawTradePayload = JSON.stringify({
+    stream: updateName,
+    data: JSON.stringify({ price: tradePrice, qty: tradeQty, ts: tradeWithTs.ts }),
+  });
+  broadcastToSubscribers(updateName, rawTradePayload);
 
   const tickerChannelName = normalizeChannel(`ticker.${normalizedMarket}`);
   const tickerPayload = JSON.stringify({
@@ -172,6 +185,42 @@ wss.on("connection", (ws) => {
           }
           if (!activeSubscriptions[normalizedParam].includes(ws)) {
             activeSubscriptions[normalizedParam].push(ws);
+          }
+
+          // Send snapshots for trades/ticker on subscribe
+          try {
+            const parts = normalizedParam.split(".");
+            if (parts.length === 2) {
+              const kind = parts[0]!.toLowerCase();
+              const pair = parts[1]!.toUpperCase();
+              const market = pair.replace("_USD", "");
+              if (kind === "trades") {
+                const buffer = tradeBuffers.get(pair);
+                if (buffer && buffer.length > 0) {
+                  const snapshot = {
+                    stream: normalizedParam,
+                    data: JSON.stringify({ trades: buffer }),
+                  };
+                  if (ws.readyState === Websocket.OPEN) {
+                    ws.send(JSON.stringify(snapshot));
+                  }
+                }
+              } else if (kind === "ticker") {
+                const manager = tickerRegistry.get(pair);
+                const cached = manager?.getTicker?.();
+                if (cached) {
+                  const snapshot = {
+                    stream: normalizedParam,
+                    data: JSON.stringify(cached),
+                  };
+                  if (ws.readyState === Websocket.OPEN) {
+                    ws.send(JSON.stringify(snapshot));
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // ignore snapshot errors
           }
         });
       } else if (parsedData.method === "UNSUBSCRIBE") {

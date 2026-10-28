@@ -58,6 +58,7 @@ function matchAgainstOrders(
   incomingQty: number,
   incomingSide: Side,
   counterpartyBook: Map<number, RestingOrder[]>,
+  incomingUserId: string,
   priceGuard?: (levelPrice: number) => boolean
 ): MatchState {
   const state: MatchState = {
@@ -72,8 +73,13 @@ function matchAgainstOrders(
 
     let levelRemaining = 0;
     for (const o of orders) {
+      if (o.userId === incomingUserId) continue;
       const avail = o.qty - o.filledQty;
       if (avail > 0) levelRemaining += avail;
+    }
+    if (levelRemaining <= 0) {
+      // skip levels that only contain own orders
+      continue;
     }
 
     for (let i = 0; i < orders.length && state.remainingQty > 0; ) {
@@ -82,6 +88,11 @@ function matchAgainstOrders(
 
       if (orderQty <= 0) {
         removeOrderFromLevel(orders, restingOrder.orderId);
+        continue;
+      }
+
+      if (restingOrder.userId === incomingUserId) {
+        i++;
         continue;
       }
 
@@ -157,9 +168,21 @@ interface HandlerCtx {
 }
 
 function handleMarketOrder(ctx: HandlerCtx): MatchResponse {
-  const { user, asset, symbol, side, isBuy, orderId, qty, counterBook, sortedLevels } = ctx;
+  const { user, asset, symbol, side, isBuy, orderId, qty, userId, counterBook, sortedLevels } = ctx;
 
-  if (counterBook.size === 0) {
+  // Check for external liquidity
+  let hasExternalLiquidity = false;
+  for (const [, orders] of sortedLevels) {
+    for (const o of orders) {
+      const avail = o.qty - o.filledQty;
+      if (avail > 0 && o.userId !== userId) {
+        hasExternalLiquidity = true;
+        break;
+      }
+    }
+    if (hasExternalLiquidity) break;
+  }
+  if (!hasExternalLiquidity) {
     return { error: `No ${isBuy ? "asks" : "bids"} available for market ${side} orders` };
   }
 
@@ -180,7 +203,7 @@ function handleMarketOrder(ctx: HandlerCtx): MatchResponse {
     assetBalance.locked += qty;
   }
 
-  const state = matchAgainstOrders(sortedLevels, qty, side, counterBook);
+  const state = matchAgainstOrders(sortedLevels, qty, side, counterBook, userId);
 
   return {
     filledQty: state.filledQty,
@@ -210,7 +233,7 @@ function handleLimitOrder(ctx: HandlerCtx & { price: number }): MatchResponse {
     assetBalance.locked += qty;
   }
 
-  const state = matchAgainstOrders(sortedLevels, qty, side, counterBook, priceGuard);
+  const state = matchAgainstOrders(sortedLevels, qty, side, counterBook, userId, priceGuard);
   const orderStatus = resolveStatus(state.filledQty, qty, false);
 
   if (state.filledQty === qty) {

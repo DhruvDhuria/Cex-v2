@@ -1,8 +1,15 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { useTicker } from "@/hooks/useTicker";
-import { quotePair } from "@/lib/api";
+import { quotePair, SUPPORTED_SYMBOLS, type Symbol_ } from "@/lib/api";
 import { formatCompact, formatNumber } from "./format";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function Stat({
   label,
@@ -28,13 +35,35 @@ function Stat({
  * channel. The window covers "since the ws-server started" and resets when the
  * ws-server restarts.
  */
-function Ticker24h({ symbol }: { symbol: string }) {
+function Ticker24h({
+  symbol,
+  onSymbolChange,
+}: {
+  symbol: string;
+  onSymbolChange?: (symbol: Symbol_) => void;
+}) {
   const ticker = useTicker(symbol);
   const change = ticker?.changePercent ?? 0;
   const positive = change >= 0;
 
   return (
     <div className="flex h-16 items-center divide-x divide-hairline overflow-x-auto rounded-md border border-hairline bg-surface scrollbar-none">
+      {onSymbolChange && (
+        <div className="flex items-center px-3">
+          <Select value={symbol} onValueChange={(v) => onSymbolChange(v as Symbol_)}>
+            <SelectTrigger className="h-8 w-28">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SUPPORTED_SYMBOLS.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <Stat
         label={`${quotePair(symbol)} last`}
         value={ticker ? formatNumber(ticker.close, 2) : "—"}

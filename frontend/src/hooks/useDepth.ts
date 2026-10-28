@@ -44,6 +44,7 @@ export function useDepth(symbol: string, lastPrice: number | null): {
   const [book, setBook] = React.useState<Book>(emptyBook);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [restLastPrice, setRestLastPrice] = React.useState<number | null>(null);
 
   // Snapshot of the book over REST. Also used to resync after a reconnect.
   const refetch = React.useCallback(async () => {
@@ -58,6 +59,7 @@ export function useDepth(symbol: string, lastPrice: number | null): {
         if (level.qty > 0) bids.set(level.price, level.qty);
       }
       setBook({ asks, bids });
+      setRestLastPrice(data.lastTradedPrice ?? null);
       setError(null);
     } catch {
       setError("Failed to load orderbook");
@@ -70,6 +72,7 @@ export function useDepth(symbol: string, lastPrice: number | null): {
     setBook(emptyBook());
     setLoading(true);
     setError(null);
+    setRestLastPrice(null);
     void refetch();
   }, [refetch]);
 
@@ -108,9 +111,9 @@ export function useDepth(symbol: string, lastPrice: number | null): {
       bids: [...book.bids.entries()]
         .map(([price, qty]) => ({ price, qty }))
         .sort((a, b) => b.price - a.price),
-      lastPrice,
+      lastPrice: lastPrice ?? restLastPrice ?? null,
     };
-  }, [book, lastPrice, loading]);
+  }, [book, lastPrice, restLastPrice, loading]);
 
   return { depth, loading, error };
 }

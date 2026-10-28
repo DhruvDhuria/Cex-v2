@@ -29,6 +29,10 @@ export class TickerManager {
     changePercent: 0,
   };
 
+  public getTicker(): TickerPayload | null {
+    return this.bucketQueue.length === 0 ? null : this.cachedTicker;
+  }
+
   public update(price: number, qty: number): TickerPayload {
     const now = Date.now();
     const currentMinuteMs = Math.floor(now / 60000) * 60000;

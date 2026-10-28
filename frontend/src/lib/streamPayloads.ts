@@ -8,6 +8,7 @@
 export interface TradePayload {
   price: number;
   qty: number;
+  ts?: number;
 }
 
 /** A single price level of the order book. `qty` is absolute, not a delta. */
@@ -39,10 +40,34 @@ function toNumber(value: unknown): number | null {
 export function parseTrade(raw: string): TradePayload | null {
   try {
     const data = JSON.parse(raw) as Record<string, unknown>;
+    if (Array.isArray(data.trades)) {
+      return null;
+    }
     const price = toNumber(data.price);
     const qty = toNumber(data.qty);
     if (price === null || qty === null) return null;
-    return { price, qty };
+    const ts = toNumber(data.ts);
+    return { price, qty, ts: ts ?? undefined };
+  } catch {
+    return null;
+  }
+}
+
+export function parseTradeSnapshot(raw: string): TradePayload[] | null {
+  try {
+    const data = JSON.parse(raw) as Record<string, unknown>;
+    if (!Array.isArray(data.trades)) return null;
+    const out: TradePayload[] = [];
+    for (const item of data.trades) {
+      if (typeof item !== "object" || item === null) continue;
+      const t = item as Record<string, unknown>;
+      const price = toNumber(t.price);
+      const qty = toNumber(t.qty);
+      if (price === null || qty === null) continue;
+      const ts = toNumber(t.ts);
+      out.push({ price, qty, ts: ts ?? undefined });
+    }
+    return out.length > 0 ? out.reverse() : out;
   } catch {
     return null;
   }

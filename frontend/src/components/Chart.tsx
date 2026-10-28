@@ -43,6 +43,7 @@ function Chart({
   const watermarkRef = useRef<ITextWatermarkPluginApi<Time> | null>(null);
   const watermarkVisibleRef = useRef(false);
   const hasDataRef = useRef(false);
+  const resizeRafRef = useRef<number | null>(null);
 
   // Create the chart once; destroy on unmount.
   useEffect(() => {
@@ -50,7 +51,9 @@ function Chart({
     if (!container) return;
 
     const chart = createChart(container, {
-      autoSize: true,
+      autoSize: false,
+      width: container.clientWidth,
+      height: container.clientHeight || 300,
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: "rgba(161, 161, 170, 0.9)",
@@ -101,7 +104,32 @@ function Chart({
     volumeSeriesRef.current = volumeSeries;
     watermarkRef.current = watermark;
 
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver((entries) => {
+        if (resizeRafRef.current !== null) {
+          cancelAnimationFrame(resizeRafRef.current);
+        }
+        resizeRafRef.current = requestAnimationFrame(() => {
+          resizeRafRef.current = null;
+          const entry = entries[entries.length - 1];
+          if (!entry || !chartRef.current) return;
+          const width = Math.floor(entry.contentRect.width);
+          const height = Math.floor(entry.contentRect.height);
+          if (width > 0 && height > 0) {
+            chartRef.current.resize(width, height);
+          }
+        });
+      });
+      ro.observe(container);
+    }
+
     return () => {
+      if (resizeRafRef.current !== null) {
+        cancelAnimationFrame(resizeRafRef.current);
+        resizeRafRef.current = null;
+      }
+      ro?.disconnect();
       watermarkRef.current = null;
       candleSeriesRef.current = null;
       volumeSeriesRef.current = null;
@@ -114,15 +142,25 @@ function Chart({
 
   // Full reset when symbol or interval changes.
   React.useEffect(() => {
-    candleSeriesRef.current?.setData([]);
-    volumeSeriesRef.current?.setData([]);
+    try {
+      candleSeriesRef.current?.setData([]);
+      volumeSeriesRef.current?.setData([]);
+    } catch {
+      // ignore
+    }
     hasDataRef.current = false;
-    if (!watermarkVisibleRef.current && watermarkRef.current && chartRef.current) {
-      chartRef.current
-        .panes()[0]?.attachPrimitive(
-          watermarkRef.current as unknown as IPanePrimitive<Time>,
-        );
-      watermarkVisibleRef.current = true;
+    if (watermarkRef.current && chartRef.current) {
+      try {
+        if (!watermarkVisibleRef.current) {
+          chartRef.current
+            .panes()[0]?.attachPrimitive(
+              watermarkRef.current as unknown as IPanePrimitive<Time>,
+            );
+        }
+        watermarkVisibleRef.current = true;
+      } catch {
+        // ignore
+      }
     }
   }, [symbol, interval]);
 
@@ -134,21 +172,51 @@ function Chart({
     if (candles.length === 0) return;
 
     if (!hasDataRef.current) {
-      candleSeries.setData(candles);
-      volumeSeries.setData(volumes);
+      try {
+        candleSeries.setData(candles);
+        volumeSeries.setData(volumes);
+      } catch {
+        // ignore
+      }
       hasDataRef.current = true;
     } else {
       const lastCandle = candles[candles.length - 1];
       const lastVolume = volumes[volumes.length - 1];
-      if (lastCandle) candleSeries.update(lastCandle);
-      if (lastVolume) volumeSeries.update(lastVolume);
+      if (lastCandle) {
+        try {
+          candleSeries.update(lastCandle);
+        } catch {
+          try {
+            candleSeries.setData(candles);
+          } catch {
+            // ignore
+          }
+        }
+      }
+      if (lastVolume) {
+        try {
+          volumeSeries.update(lastVolume);
+        } catch {
+          try {
+            volumeSeries.setData(volumes);
+          } catch {
+            // ignore
+          }
+        }
+      }
     }
 
-    if (watermarkVisibleRef.current && watermarkRef.current && chartRef.current) {
-      chartRef.current
-        .panes()[0]?.detachPrimitive(
-          watermarkRef.current as unknown as IPanePrimitive<Time>,
-        );
+    if (watermarkRef.current && chartRef.current) {
+      try {
+        if (watermarkVisibleRef.current) {
+          chartRef.current
+            .panes()[0]?.detachPrimitive(
+              watermarkRef.current as unknown as IPanePrimitive<Time>,
+            );
+        }
+      } catch {
+        // ignore
+      }
       watermarkVisibleRef.current = false;
     }
   }, [candles, volumes]);

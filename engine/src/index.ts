@@ -328,6 +328,7 @@ async function handleEngineRequest(message: EngineRequest): Promise<unknown> {
       symbol,
       asks,
       bids,
+      lastTradedPrice: book?.lastTradedPrice ?? null,
     };
   } else if (message.type === "get_user_balance") {
     if (!isId(message.payload, message.type)) {

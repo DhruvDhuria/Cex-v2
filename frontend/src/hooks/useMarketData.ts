@@ -1,7 +1,7 @@
 import React from "react";
 import { wsChannel } from "@/lib/api";
 import { useStreamSubscription } from "@/lib/wsClient";
-import { parseTrade, type TradePayload } from "@/lib/streamPayloads";
+import { parseTrade, parseTradeSnapshot, type TradePayload } from "@/lib/streamPayloads";
 
 export interface Trade {
   price: number;
@@ -31,13 +31,30 @@ export function useMarketData(symbol: string): {
   }, []);
 
   const handleTrade = React.useCallback((raw: string) => {
+    const snapshot = parseTradeSnapshot(raw);
+    if (snapshot) {
+      if (snapshot.length > 0) {
+        const tsNow = Date.now();
+        const normalized = snapshot.slice(0, MAX_TRADES).map((t, i) => ({
+          price: t.price,
+          qty: t.qty,
+          ts: t.ts ?? tsNow - i,
+        }));
+        setTrades(normalized);
+        setLastPrice(normalized[0]!.price);
+      }
+      return;
+    }
+
     const data = parseTrade(raw);
     if (!data) return;
 
     setLastPrice(data.price);
-    setTrades((prev) =>
-      [{ ...data, ts: Date.now() }, ...prev].slice(0, MAX_TRADES),
-    );
+    setTrades((prev) => {
+      const ts = data.ts ?? Date.now();
+      const next = [{ ...data, ts }, ...prev];
+      return next.slice(0, MAX_TRADES);
+    });
     listeners.current.forEach((listener) => {
       try {
         listener(data);
