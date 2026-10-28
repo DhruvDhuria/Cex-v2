@@ -15,8 +15,9 @@ function Signin() {
     e.preventDefault();
     setError(null);
     try {
-      const response = await api.post<{ token: string }>("/signin", { username, password });
+      const response = await api.post<{ token: string; username?: string }>("/signin", { username, password });
       setToken(response.data.token);
+      localStorage.setItem("cex_username", response.data.username || username);
       navigate("/trade");
     } catch (err) {
       setError(

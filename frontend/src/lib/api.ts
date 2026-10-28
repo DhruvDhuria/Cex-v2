@@ -55,16 +55,33 @@ api.interceptors.response.use(
   },
 );
 
+const USERNAME_KEY = "cex_username";
+
 export function getToken(): string | null {
   return typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_KEY) : null;
 }
 
 export function setToken(token: string): void {
-  window.localStorage.setItem(TOKEN_KEY, token);
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(TOKEN_KEY, token);
+  }
+}
+
+export function setUsername(username: string): void {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(USERNAME_KEY, username);
+  }
+}
+
+export function getUsername(): string | null {
+  return typeof window !== "undefined" ? window.localStorage.getItem(USERNAME_KEY) : null;
 }
 
 export function clearToken(): void {
-  window.localStorage.removeItem(TOKEN_KEY);
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(TOKEN_KEY);
+    window.localStorage.removeItem(USERNAME_KEY);
+  }
 }
 
 export type OrderSide = "buy" | "sell";
@@ -105,6 +122,7 @@ export interface DepthResponse {
   symbol: string;
   asks: DepthLevel[];
   bids: DepthLevel[];
+  lastTradedPrice?: number | null;
 }
 
 export interface Balance {
@@ -137,4 +155,45 @@ export async function addBalance(symbol: string, amount: number): Promise<Balanc
 export async function withdrawBalance(symbol: string, amount: number): Promise<Balances> {
   const { data } = await api.post<{ balance: Balances }>("/balance/withdraw", { symbol, amount });
   return data.balance ?? {};
+}
+
+export interface Order {
+  id: string;
+  userId: string;
+  market: string;
+  price: number | null;
+  quantity: number;
+  type: string;
+  side: string;
+  filledQuantity: number;
+  status: string;
+}
+
+export interface FillRecord {
+  id: string;
+  quantity: number;
+  side: string;
+  type: string;
+  userId: string;
+  price: number;
+  asset: string;
+  orignalOrderId: string;
+}
+
+export async function fetchOrders(): Promise<Order[]> {
+  const { data } = await api.get<{ orders: Order[] } | Order[]>("/orders");
+  if (Array.isArray(data)) return data;
+  return data.orders ?? [];
+}
+
+export async function fetchOpenOrders(): Promise<Order[]> {
+  const { data } = await api.get<{ orders: Order[] } | Order[]>("/orders/open");
+  if (Array.isArray(data)) return data;
+  return data.orders ?? [];
+}
+
+export async function fetchFills(): Promise<FillRecord[]> {
+  const { data } = await api.get<{ fills: FillRecord[] } | FillRecord[]>("/fills");
+  if (Array.isArray(data)) return data;
+  return data.fills ?? [];
 }

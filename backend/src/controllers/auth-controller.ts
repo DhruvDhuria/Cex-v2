@@ -70,7 +70,9 @@ export async function signin(req: Request, res: Response): Promise<void> {
 
     res.json({
       message: "Signed in successfully",
-      token
+      token,
+      userId: user.id,
+      username: user.username
     })
 
   } catch (error) {

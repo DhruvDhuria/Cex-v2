@@ -15,8 +15,13 @@ function Signup() {
     e.preventDefault();
     setError(null);
     try {
-      const response = await api.post<{ token: string }>("/signup", { username, password });
+      const response = await api.post<{ token: string; username?: string }>("/signup", { username, password });
       setToken(response.data.token);
+      if (response.data.username) {
+        localStorage.setItem("cex_username", response.data.username);
+      } else {
+        localStorage.setItem("cex_username", username);
+      }
       navigate("/trade");
     } catch (err) {
       setError(

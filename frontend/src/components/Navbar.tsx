@@ -16,6 +16,9 @@ export default function Navbar() {
 
   const handleSignOut = () => {
     clearToken();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("cex_username");
+    }
     navigate("/trade");
   };
 
@@ -41,9 +44,6 @@ export default function Navbar() {
             <>
               <Button asChild variant="outline" size="sm">
                 <Link to="/dashboard?mode=add">Deposit</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link to="/dashboard?mode=withdraw">Withdraw</Link>
               </Button>
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
                 Sign out
