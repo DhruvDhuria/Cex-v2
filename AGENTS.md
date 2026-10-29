@@ -31,7 +31,8 @@ Copy `.env.example` → `.env` in `backend/`, `engine/`, and optionally `ws-serv
 - Engine MUST reply to `responseQueue` with the same `correlationId` (backend matches replies by it, `store/pending-responses.ts`).
 - Each backend process uses its own queue `response-queue-<BACKEND_QUEUE_ID>`; the `responseQueue` env var falls back to a random UUID, so set `BACKEND_QUEUE_ID` for stability.
 - Backend times out (`ENGINE_TIMEOUT_MS`, default 30000) if the engine doesn't answer.
-- Message types: `create_order`, `get_depth`, `get_user_balance`, `get_order`, `cancel_order`, plus non-standard `add_balance` and `withdraw_balance` the engine supports for funding (backend `POST /balance` and `/balance/withdraw`). The engine keys cash as `usd` (lowercase) — fund that key for fiat to be usable by the matcher.
+- Message types: `create_order`, `get_depth`, `get_user_balance`, `get_order`, `get_user_fills`, `cancel_order`, plus non-standard `add_balance` and `withdraw_balance` the engine supports for funding (backend `POST /balance` and `/balance/withdraw`). The engine keys cash as `usd` (lowercase) — fund that key for fiat to be usable by the matcher.
+- The backend type mirror lives in `backend/src/types/engine.ts`; **both** it and `engine/src/index.ts` must list a command, or the engine rejects it as unsupported.
 
 ## Engine specifics
 
@@ -39,7 +40,9 @@ Copy `.env.example` → `.env` in `backend/`, `engine/`, and optionally `ws-serv
 - `engine/src/index.ts` hardcodes assets and initializes order books only for `BTC`, `ETH`, `SOL` — adding a new symbol requires editing this list.
 - There is **one matching implementation**: `utils/matchAlgorithmOptimized.ts` (imported by `index.ts`). The older `utils/matchAlgorithm.ts` has been deleted — do not restore it.
 - Balance settlement between matched users lives in `index.ts` (not in the matcher); the matcher only returns aggregate fills and mutates the book.
-- `engine/src/streams.ts` publishes to two Redis streams — `depthStream` (absolute per-level qty) and `aggtradesStream` (`{price, qty}`) — consumed by `ws-server`. There is **no `booktickerStream`**; it was replaced by the 24h `ticker` channel.
+- Fills are created in `index.ts` as **two records per match**: a `maker` fill for the resting order's user and a `taker` fill for the incoming order's user. Each `Fill` carries `fillId`, `symbol`, `price`, `qty`, `type`, `fillType` (`"maker" | "taker"`), `side`, `userId`, `orderId`, `createdAt`. `create_order` returns all fills created by the match (both sides); `get_user_fills` filters the in-memory `FILLS` array by `userId`.
+- `engine/src/streams.ts` publishes to two Redis streams — `depthStream` (absolute per-level qty) and `aggtradesStream` (`{price, qty}`, no timestamp; consumers derive it from the stream entry id) — consumed by `ws-server` and the backend trade-history endpoint. There is **no `booktickerStream`**; it was replaced by the 24h `ticker` channel.
+- `aggtradesStream` is **not trimmed** and acts as the de-facto trade log. It survives engine restarts as long as Redis persists, but `FILLS`/`ORDERS` in memory do not.
 
 ## ws-server
 
@@ -47,16 +50,31 @@ Copy `.env.example` → `.env` in `backend/`, `engine/`, and optionally `ws-serv
 - Channel keys are normalised to `<kind lowercase>.<PAIR uppercase>`. Subscribe and broadcast MUST both go through `normalizeChannel` — a mismatch silently delivers nothing.
 - Every frame is `{ stream, data }` where `data` is always a **JSON string** (the client parses it once).
 - The 24h ticker is computed in-process by `utils/tickerManager.ts` from the trade stream. Its window is "since ws-server boot" and resets on restart.
+- On subscribe it sends only an in-memory **50-trade snapshot** (Trades panel) and cached ticker — it does **not** replay full history. Long-range history comes from the backend REST endpoint below.
+
+## Trade history & chart
+
+- `GET /trades/:symbol?limit=` (public) is implemented by `getTradeHistory` in `backend/src/controllers/exchange-controller.ts`; it calls `readTradeHistory` in `backend/src/utils/engine-client.ts`, which `XREVRANGE`s `aggtradesStream`, filters by `market`, derives `ts` from the stream entry id (`<ms>-<seq>`), and returns ascending `{price, qty, ts}`. Default limit 1000, max 5000.
+- `frontend/src/hooks/useCandles.ts` builds OHLCV from two sources: localStorage cache (`cex_candles:<SYMBOL>:<interval>`) for instant paint, then `GET /trades/:symbol` history which wins over the overlapping cache window (older cached bars are kept). Live trades arriving during hydration are queued and replayed. There is **no dummy seed data** — an empty market renders an empty chart.
+- Cache writes are debounced and capped at 500 bars; the chart no longer resets to fake data on refresh.
 
 ## Backend / Prisma gotchas
 
 - Prisma client is **generated into a custom path**: `backend/prisma/generated/prisma` (set in `schema.prisma` generator `output`). `db.ts` imports `../prisma/generated/prisma/client`. Run `prisma generate` after any schema change, and ensure the generated dir exists before running.
 - `db.ts` uses the pg adapter and requires `DATABASE_URL`.
-- Auth: passwords bcrypt-hashed; JWT via `createToken` in `backend/src/utils/auth.ts`. `/signup` and `/signin` are DB-only; `GET /depth/:symbol` is public; all other exchange routes require `Authorization: Bearer <jwt>`.
+- Numeric columns (`Order.price/quantity/filledQuantity`, `Fill.price/quantity`) are **`Float`**, not `Int`, so decimal orders persist. Migration `20261029080146_float_order_numbers` has been applied; re-run `bun x prisma migrate dev` if the DB is reset.
+- Auth: passwords bcrypt-hashed; JWT via `createToken` in `backend/src/utils/auth.ts`. `/signup` and `/signin` are DB-only; `GET /depth/:symbol` and `GET /trades/:symbol` are public; all other exchange routes require `Authorization: Bearer <jwt>`.
 
 ## Dashboard & DB persistence (recent updates)
 
-- **Backend persistence**: On `POST /order`, backend now persists orders/fills to Postgres via Prisma. Ensures `Stock` rows exist, creates/updates `Order` records, and writes `Fill` records for fills returned by the engine. For existing resting orders that get filled later, dashboard endpoints sync status from the engine.
-- **Dashboard API endpoints** (auth required): `GET /orders` (all orders for user), `GET /orders/open` (open orders), `GET /fills` (all fills for user). Routes added in `backend/src/routes/exchange-routes.ts`, implemented in `backend/src/controllers/exchange-controller.ts`. Prisma models used: `Order`, `Fill`, `Stock` (see `backend/prisma/schema.prisma`).
-- **Auth**: `POST /signin` now returns `userId` and `username` in addition to `token` (for client profile display).
-- **Frontend dashboard**: Redesigned at `frontend/src/pages/Dashboard.tsx` with profile header (initials + username), balances panel (`frontend/src/components/BalancesPanel.tsx`), orders/fills tabs, and a deposit/withdraw popup modal (`frontend/src/components/DepositWithdrawModal.tsx`, `frontend/src/components/ui/dialog.tsx`). Username stored in `localStorage` as `cex_username`. API helpers added in `frontend/src/lib/api.ts` for fetching orders/fills.
+- **Backend persistence**: On `POST /order`, backend persists orders/fills to Postgres via Prisma. It ensures `Stock` rows exist, creates/updates the `Order` row, and writes **both maker and taker fills** returned by the engine via `persistEngineFills` (deduped by `fillId`, each row keyed by its own `userId`/`orderId`/`side`/`fillType`). Referenced orders must already exist.
+- **Fill reconciliation**: `GET /fills` first calls the engine's `get_user_fills` and persists any unseen fills (e.g. a resting limit order filled later). Reconciliation errors are ignored so Postgres fills still return if the engine is down.
+- **Dashboard API endpoints** (auth required): `GET /orders` (all orders for user), `GET /orders/open` (open orders), `GET /fills` (all fills for user). Open-order status/filled qty is synced from the engine on fetch. Routes in `backend/src/routes/exchange-routes.ts`, implemented in `backend/src/controllers/exchange-controller.ts`. Prisma models: `Order`, `Fill`, `Stock`.
+- **Auth**: `POST /signin` returns `userId` and `username` in addition to `token` (for client profile display).
+- **Frontend dashboard**: `frontend/src/pages/Dashboard.tsx` has a profile header (initials + username), balances panel (`BalancesPanel.tsx`), orders/fills tabs, and a deposit/withdraw dialog (`DepositWithdrawModal.tsx`, which has its own Deposit/Withdraw toggle). Username is stored in `localStorage` as `cex_username`. API helpers live in `frontend/src/lib/api.ts`.
+
+## Frontend layout & UI notes
+
+- `App.tsx` `<main>` is **not** vertically centered; Trade/Dashboard start at the top. Only the auth pages (`pages/auth/SigninPage.tsx`, `SignupPage.tsx`) center their card with `flex flex-1 items-center justify-center`.
+- Navbar signed-in action is a single **Deposit/withdraw** link to `/dashboard?mode=add`, which opens the modal. `ProfileHeader` intentionally renders no deposit/withdraw buttons.
+- `console.log` statements have been removed across all subprojects; use `console.error` only for real errors.
