@@ -33,12 +33,17 @@ export interface OrderRecord {
   createdAt: number;
 }
 
+export type FillType = "maker" | "taker";
+
 export interface Fill {
   fillId: string;
   symbol: string;
   price: number;
   qty: number;
   type: string;
+  fillType: FillType;
+  side: Side;
+  userId: string;
   orderId: string;
   createdAt: number;
 }

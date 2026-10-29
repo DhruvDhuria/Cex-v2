@@ -56,11 +56,11 @@ model Order {
   id    String      @id   @default(uuid())
   userId    String
   market    String
-  price     Int?    
-  quantity  Int
+  price     Float?    
+  quantity  Float
   type      OrderType
   side      OrderSide
-  filledQuantity   Int
+  filledQuantity   Float
   status            OrderStatus
   
   user    User    @relation(fields: [userId], references: [id])
@@ -69,12 +69,12 @@ model Order {
 }
 
 model Fill {
-  id                String    @id   @default(uuid())
-  quantity          Int
+  id                String    @id @default(uuid())
+  quantity          Float
   side              OrderSide
   type              FillType
   userId            String
-  price             Int
+  price             Float
   asset             String
   orignalOrderId    String
 

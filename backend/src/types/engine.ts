@@ -3,6 +3,7 @@ export type EngineCommandType =
   | "get_depth"
   | "get_user_balance"
   | "get_order"
+  | "get_user_fills"
   | "cancel_order"
   | "add_balance"
   | "withdraw_balance";

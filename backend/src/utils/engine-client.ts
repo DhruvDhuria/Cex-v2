@@ -26,6 +26,58 @@ export async function pingRedis(): Promise<string> {
   return publisher.ping();
 }
 
+export interface TradeHistoryEntry {
+  price: number;
+  qty: number;
+  ts: number;
+}
+
+const TRADES_STREAM = "aggtradesStream";
+
+/**
+ * Reads recent trades for a market straight from the engine's Redis stream.
+ *
+ * The stream retains every published trade, so this is the source of truth for
+ * chart history. `ts` comes from the stream entry id (`<ms>-<seq>`), which is
+ * the moment the engine published the trade.
+ */
+export async function readTradeHistory(
+  symbol: string,
+  limit: number,
+): Promise<TradeHistoryEntry[]> {
+  const normalized = symbol.toUpperCase();
+  // The stream is shared by every market, so over-fetch before filtering.
+  const entries = await publisher.xRevRange(TRADES_STREAM, "+", "-", {
+    COUNT: limit * 4,
+  });
+
+  const trades: TradeHistoryEntry[] = [];
+  for (const entry of entries) {
+    if (trades.length >= limit) break;
+
+    const message = entry.message as Record<string, string>;
+    if ((message.market ?? "").toUpperCase() !== normalized) continue;
+
+    let parsed: { price?: unknown; qty?: unknown };
+    try {
+      parsed = JSON.parse(message.data ?? "{}") as { price?: unknown; qty?: unknown };
+    } catch {
+      continue;
+    }
+
+    const price = Number(parsed.price);
+    const qty = Number(parsed.qty);
+    const ts = Number(entry.id.split("-")[0]);
+    if (!Number.isFinite(price) || !Number.isFinite(qty) || !Number.isFinite(ts)) {
+      continue;
+    }
+
+    trades.push({ price, qty, ts });
+  }
+
+  return trades.reverse();
+}
+
 export async function sendToEngine(
   type: EngineCommandType,
   payload: Record<string, unknown>,
@@ -45,8 +97,6 @@ export async function sendToEngine(
 }
 
 export async function listenForEngineResponses(): Promise<void> {
-  console.log(`Listening for engine responses on ${env.responseQueue}`);
-
   for (;;) {
     const response = await subscriber.brPop(env.responseQueue, 0);
     if (!response) continue;

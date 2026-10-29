@@ -142,6 +142,22 @@ export async function fetchDepth(symbol: string): Promise<DepthResponse> {
   return data;
 }
 
+export interface TradeRecord {
+  price: number;
+  qty: number;
+  ts: number;
+}
+
+export async function fetchTradeHistory(
+  symbol: string,
+  limit = 1000,
+): Promise<TradeRecord[]> {
+  const { data } = await api.get<{ trades: TradeRecord[] }>(`/trades/${symbol}`, {
+    params: { limit },
+  });
+  return data.trades ?? [];
+}
+
 export async function fetchBalance(): Promise<Balances> {
   const { data } = await api.get<{ balance: Balances | null }>("/balance");
   return data.balance ?? {};

@@ -53,3 +53,10 @@ Copy `.env.example` → `.env` in `backend/`, `engine/`, and optionally `ws-serv
 - Prisma client is **generated into a custom path**: `backend/prisma/generated/prisma` (set in `schema.prisma` generator `output`). `db.ts` imports `../prisma/generated/prisma/client`. Run `prisma generate` after any schema change, and ensure the generated dir exists before running.
 - `db.ts` uses the pg adapter and requires `DATABASE_URL`.
 - Auth: passwords bcrypt-hashed; JWT via `createToken` in `backend/src/utils/auth.ts`. `/signup` and `/signin` are DB-only; `GET /depth/:symbol` is public; all other exchange routes require `Authorization: Bearer <jwt>`.
+
+## Dashboard & DB persistence (recent updates)
+
+- **Backend persistence**: On `POST /order`, backend now persists orders/fills to Postgres via Prisma. Ensures `Stock` rows exist, creates/updates `Order` records, and writes `Fill` records for fills returned by the engine. For existing resting orders that get filled later, dashboard endpoints sync status from the engine.
+- **Dashboard API endpoints** (auth required): `GET /orders` (all orders for user), `GET /orders/open` (open orders), `GET /fills` (all fills for user). Routes added in `backend/src/routes/exchange-routes.ts`, implemented in `backend/src/controllers/exchange-controller.ts`. Prisma models used: `Order`, `Fill`, `Stock` (see `backend/prisma/schema.prisma`).
+- **Auth**: `POST /signin` now returns `userId` and `username` in addition to `token` (for client profile display).
+- **Frontend dashboard**: Redesigned at `frontend/src/pages/Dashboard.tsx` with profile header (initials + username), balances panel (`frontend/src/components/BalancesPanel.tsx`), orders/fills tabs, and a deposit/withdraw popup modal (`frontend/src/components/DepositWithdrawModal.tsx`, `frontend/src/components/ui/dialog.tsx`). Username stored in `localStorage` as `cex_username`. API helpers added in `frontend/src/lib/api.ts` for fetching orders/fills.

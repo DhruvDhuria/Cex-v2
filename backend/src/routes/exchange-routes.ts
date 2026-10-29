@@ -5,6 +5,7 @@ import {
   getBalance,
   getDepth,
   getOrder,
+  getTradeHistory,
   addBalance,
   withdrawBalance,
   getOrders,
@@ -19,6 +20,7 @@ export const exchangeRouter = Router();
 exchangeRouter.post("/order", requireAuth, asyncHandler(createOrder));
 // Market data is public: the orderbook is needed before signing in.
 exchangeRouter.get("/depth/:symbol", asyncHandler(getDepth));
+exchangeRouter.get("/trades/:symbol", asyncHandler(getTradeHistory));
 exchangeRouter.get("/balance", requireAuth, asyncHandler(getBalance));
 exchangeRouter.post('/balance', requireAuth, asyncHandler(addBalance));
 exchangeRouter.post('/balance/withdraw', requireAuth, asyncHandler(withdrawBalance));

@@ -28,6 +28,7 @@ export type EngineCommandType =
   | "get_depth"
   | "get_user_balance"
   | "get_order"
+  | "get_user_fills"
   | "cancel_order"
   | "add_balance"
   | "withdraw_balance";
@@ -83,6 +84,7 @@ type RequestKeyMap = {
   get_order: "orderId";
   cancel_order: "orderId";
   get_user_balance: "userId";
+  get_user_fills: "userId";
   add_balance: "userId";
   withdraw_balance: "userId";
 };
@@ -101,6 +103,7 @@ function isId<K extends string>(
     requestType === "get_order" || requestType === "cancel_order"
       ? "orderId"
       : requestType === "get_user_balance" ||
+          requestType === "get_user_fills" ||
           requestType === "add_balance" ||
           requestType === "withdraw_balance"
         ? "userId"
@@ -174,7 +177,8 @@ async function handleEngineRequest(message: EngineRequest): Promise<unknown> {
 
     const touchedAsks = new Set<number>();
     const touchedBids = new Set<number>();
-    const fills: Fill[] = [];
+    const takerFills: Fill[] = [];
+    const allFills: Fill[] = [];
 
     if (result.priceAggregate) {
       for (const [priceKey, items] of result.priceAggregate) {
@@ -218,18 +222,36 @@ async function handleEngineRequest(message: EngineRequest): Promise<unknown> {
             makerRecord.status = statusFor(makerRecord.filledQty, makerRecord.qty);
           }
 
-          const fill: Fill = {
+          const createdAt = Date.now();
+          const makerFill: Fill = {
+            fillId: crypto.randomUUID(),
+            symbol: order.symbol,
+            price: priceKey,
+            qty: matchedQty,
+            type: makerRecord?.type ?? "limit",
+            fillType: "maker",
+            side: makerRecord?.side ?? (order.side === "buy" ? "sell" : "buy"),
+            userId: item.matchedUser,
+            orderId: item.orderId,
+            createdAt,
+          };
+          const takerFill: Fill = {
             fillId: crypto.randomUUID(),
             symbol: order.symbol,
             price: priceKey,
             qty: matchedQty,
             type: order.type,
-            orderId: item.orderId,
-            createdAt: Date.now(),
+            fillType: "taker",
+            side: order.side,
+            userId: order.userId,
+            orderId: result.orderId!,
+            createdAt,
           };
-          FILLS.push(fill);
-          fills.push(fill);
-          makerRecord?.fills.push(fill);
+
+          FILLS.push(makerFill, takerFill);
+          takerFills.push(takerFill);
+          allFills.push(makerFill, takerFill);
+          makerRecord?.fills.push(makerFill);
 
           book.lastTradedPrice = priceKey;
 
@@ -290,7 +312,7 @@ async function handleEngineRequest(message: EngineRequest): Promise<unknown> {
       qty: order.qty,
       filledQty: result.filledQty ?? 0,
       status: result.orderStatus ?? "open",
-      fills,
+      fills: takerFills,
       createdAt: Date.now(),
     });
 
@@ -299,7 +321,7 @@ async function handleEngineRequest(message: EngineRequest): Promise<unknown> {
       status: result.orderStatus,
       filledQty: result.filledQty,
       averagePrice: price,
-      fills: fills,
+      fills: allFills,
     };
   } else if (message.type === "get_depth") {
     if (!isId(message.payload, message.type)) {
@@ -351,6 +373,14 @@ async function handleEngineRequest(message: EngineRequest): Promise<unknown> {
     }
     return {
       order,
+    };
+  } else if (message.type === "get_user_fills") {
+    if (!isId(message.payload, message.type)) {
+      return { error: "invalid userId" };
+    }
+    const fills = FILLS.filter((fill) => fill.userId === message.payload.userId);
+    return {
+      fills,
     };
   } else if (message.type === "cancel_order") {
     if (!isId(message.payload, message.type) || !hasUserId(message.payload)) {
@@ -479,8 +509,6 @@ async function handleEngineRequest(message: EngineRequest): Promise<unknown> {
 async function sendResponse(responseQueue: string, response: EngineResponse): Promise<void> {
   await commandClient.lPush(responseQueue, JSON.stringify(response));
 }
-
-console.log(`Engine listening on Redis queue: ${env.incomingQueue}`);
 
 for (;;) {
   const item = await brokerClient.brPop(env.incomingQueue, 0);
