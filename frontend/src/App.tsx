@@ -11,7 +11,7 @@ export function App() {
   return (
     <div className="relative z-0 flex min-h-screen flex-col text-white">
       <Navbar />
-      <main className="flex flex-1 flex-col justify-center bg-background">
+      <main className="flex flex-1 flex-col bg-background">
         <Routes>
           <Route path="/" element={<Navigate to="/trade" replace />} />
           <Route path="/trade" element={<Trade />} />

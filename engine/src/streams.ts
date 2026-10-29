@@ -42,7 +42,6 @@ export async function publishToStream(
       market,
       data: JSON.stringify(data),
     });
-    console.log(`Published ${type} for ${market} ${JSON.stringify(data)}`);
   } catch (error) {
     console.error(`Failed to publish ${type} for ${market}`, error);
   }

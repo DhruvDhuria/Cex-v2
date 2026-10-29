@@ -1,23 +1,18 @@
-import React from "react";
-import { Button } from "@/components/ui/button";
-
 function getInitials(name: string | null) {
   if (!name) return "U";
   const trimmed = name.trim();
   if (!trimmed) return "U";
   const parts = trimmed.split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
+  const first = parts[0] ?? "";
+  if (parts.length === 1) return first.slice(0, 2).toUpperCase();
+  const second = parts[1] ?? "";
+  return (first.charAt(0) + second.charAt(0)).toUpperCase();
 }
 
 export default function ProfileHeader({
   username,
-  onDeposit,
-  onWithdraw,
 }: {
   username: string | null;
-  onDeposit: () => void;
-  onWithdraw: () => void;
 }) {
   const initials = getInitials(username);
 
@@ -31,14 +26,6 @@ export default function ProfileHeader({
           <span className="text-sm font-medium">{username || "User"}</span>
           <span className="text-xs text-muted-foreground">Account</span>
         </div>
-      </div>
-      <div className="flex items-center gap-2">
-        <Button size="sm" variant="outline" onClick={onDeposit}>
-          Deposit
-        </Button>
-        <Button size="sm" variant="outline" onClick={onWithdraw}>
-          Withdraw
-        </Button>
       </div>
     </div>
   );

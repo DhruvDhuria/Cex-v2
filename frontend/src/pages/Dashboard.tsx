@@ -138,17 +138,7 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6">
-      <ProfileHeader
-        username={username}
-        onDeposit={() => {
-          setModalMode("add");
-          setModalOpen(true);
-        }}
-        onWithdraw={() => {
-          setModalMode("withdraw");
-          setModalOpen(true);
-        }}
-      />
+      <ProfileHeader username={username} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">
           <BalancesPanel refreshKey={refreshKey} />

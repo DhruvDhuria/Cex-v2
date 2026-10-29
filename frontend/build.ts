@@ -7,7 +7,7 @@ await rm(outdir, { recursive: true, force: true });
 
 const entrypoints = [...new Bun.Glob("src/**/*.html").scanSync()];
 
-const result = await Bun.build({
+await Bun.build({
   entrypoints,
   outdir,
   plugins: [tailwind],
@@ -18,7 +18,3 @@ const result = await Bun.build({
     "process.env.NODE_ENV": JSON.stringify("production"),
   },
 });
-
-for (const output of result.outputs) {
-  console.log(` ${path.relative(process.cwd(), output.path)}  ${(output.size / 1024).toFixed(1)} KB`);
-}

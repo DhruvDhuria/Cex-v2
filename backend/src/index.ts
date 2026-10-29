@@ -51,7 +51,4 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(statusForError(message)).json({ error: message });
 });
 
-app.listen(env.port, () => {
-  console.log(`Backend running on http://localhost:${env.port}`);
-  console.log(`Response queue: ${env.responseQueue}`);
-});
+app.listen(env.port);

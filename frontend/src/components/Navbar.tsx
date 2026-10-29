@@ -43,7 +43,7 @@ export default function Navbar() {
           {authed ? (
             <>
               <Button asChild variant="outline" size="sm">
-                <Link to="/dashboard?mode=add">Deposit</Link>
+                <Link to="/dashboard?mode=add">Deposit/withdraw</Link>
               </Button>
               <Button variant="ghost" size="sm" onClick={handleSignOut}>
                 Sign out

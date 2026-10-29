@@ -35,7 +35,6 @@ function broadcastToSubscribers(channelName: string, payload: string) {
   subscribers.forEach((ws) => {
     if (ws.readyState === Websocket.OPEN) {
       ws.send(payload);
-      console.log(`Broadcasted to ${channelName}: ${payload}`);
     }
   });
 }
@@ -149,7 +148,6 @@ async function readStreamForever(
   }
 }
 
-console.log("Stream loop started...");
 void readStreamForever("depthStream", handleDepthEvent);
 void readStreamForever("aggtradesStream", handleTradesEvent);
 

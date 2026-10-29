@@ -68,7 +68,6 @@ function connect() {
 
     handlers.get(parsed.stream)?.forEach((handler) => {
       try {
-        console.log(`Received message for ${parsed.stream}: ${raw}`);
         handler(raw);
       } catch {
         // a broken handler must not kill the socket
