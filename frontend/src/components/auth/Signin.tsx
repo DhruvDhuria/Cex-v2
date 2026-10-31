@@ -29,7 +29,7 @@ function Signin() {
   return (
     <form className="text-white" onSubmit={(e) => void handleSubmit(e)}>
       <h1 className="text-4xl pb-2 font-bold">Welcome Back</h1>
-      <p className="text-xs text-neutral-50 pb-4">Please enter your details to sign in.</p>
+      <p className="text-xs text-muted-foreground pb-4">Please enter your details to sign in.</p>
       <div className="flex flex-col gap-2">
         <Label htmlFor="username">Username</Label>
         <Input
@@ -49,10 +49,8 @@ function Signin() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        {error && <p className="text-xs text-red-500">{error}</p>}
-        <Button variant={"secondary"} type="submit">
-          Sign in
-        </Button>
+        {error && <p className="text-xs text-negative">{error}</p>}
+        <Button type="submit">Sign in</Button>
       </div>
     </form>
   );

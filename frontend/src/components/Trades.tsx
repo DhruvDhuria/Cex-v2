@@ -33,7 +33,7 @@ export default function Trades({ trades }: { trades: Trade[] }) {
                 i === 0 && "animate-in fade-in duration-500",
               )}
             >
-              <span className={cn("text-left", up ? "text-buy" : "text-sell")}>
+              <span className={cn("text-left", up ? "text-accent" : "text-negative")}>
                 {formatNumber(trade.price, 2)}
               </span>
               <span className="text-foreground/80">{formatNumber(trade.qty, 4)}</span>

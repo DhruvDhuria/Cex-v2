@@ -63,17 +63,17 @@ export default function Orderbook({
           onMouseLeave={() => setHovered(null)}
           className={cn(
             "num relative grid h-5.5 w-full grid-cols-3 items-center px-3 text-right text-[11px] tabular-nums transition-colors",
-            highlighted ? "bg-accent/60" : "hover:bg-accent/40",
+            highlighted ? "bg-accent/45" : "hover:bg-accent/40",
           )}
         >
           <span
-            className="absolute inset-y-0 right-0"
-            style={{
-              width: `${(row.total / maxTotal) * 100}%`,
-              backgroundColor: side === "ask" ? "var(--sell-muted)" : "var(--buy-muted)",
-            }}
+            className={cn(
+              "absolute inset-y-0 right-0",
+              side === "ask" ? "bg-negative/45" : "bg-accent/45",
+            )}
+            style={{ width: `${(row.total / maxTotal) * 100}%` }}
           />
-          <span className={cn("z-10 text-left", side === "ask" ? "text-sell" : "text-buy")}>
+          <span className={cn("z-10 text-left", side === "ask" ? "text-negative" : "text-accent")}>
             {formatNumber(row.price, 2)}
           </span>
           <span className="z-10 text-muted-foreground">{formatNumber(row.size, 4)}</span>
@@ -107,7 +107,7 @@ export default function Orderbook({
               onClick={() => setFilter(key)}
               className={cn(
                 "size-5 rounded-sm text-muted-foreground hover:text-foreground",
-                filter === key && "bg-accent text-foreground",
+                filter === key && "bg-accent text-accent-foreground",
               )}
             >
               <Icon className="size-3" />
@@ -123,7 +123,7 @@ export default function Orderbook({
       </div>
 
       {loading && !depth && <p className="px-3 py-2 text-xs text-muted-foreground">Loading…</p>}
-      {error && <p className="px-3 py-2 text-xs text-destructive">{error}</p>}
+      {error && <p className="px-3 py-2 text-xs text-negative">{error}</p>}
 
       {depth && (
         <div className="flex flex-1 flex-col justify-center">

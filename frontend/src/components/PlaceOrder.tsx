@@ -98,13 +98,13 @@ function PlaceOrder({ symbol }: { symbol: string }) {
         <TabsList className="h-16 w-full rounded-none border-b border-hairline bg-transparent p-0">
           <TabsTrigger
             value="buy"
-            className="h-12 flex-1 rounded-none border-0 border-b-2 border-transparent bg-transparent text-sm  font-semibold data-[state=active]:border-buy data-[state=active]:bg-buy/10 data-[state=active]:text-buy data-[state=active]:shadow-none"
+            className="h-12 flex-1 rounded-none border-0 border-b-2 border-transparent bg-transparent text-sm font-semibold data-[state=active]:border-accent data-[state=active]:bg-accent/10 data-[state=active]:text-accent data-[state=active]:shadow-none"
           >
             Buy
           </TabsTrigger>
           <TabsTrigger
             value="sell"
-            className="h-12 flex-1 rounded-none border-0 border-b-2 border-transparent bg-transparent text-sm font-semibold data-[state=active]:border-sell data-[state=active]:bg-sell/10 data-[state=active]:text-sell data-[state=active]:shadow-none"
+            className="h-12 flex-1 rounded-none border-0 border-b-2 border-transparent bg-transparent text-sm font-semibold data-[state=active]:border-negative data-[state=active]:bg-negative/10 data-[state=active]:text-negative data-[state=active]:shadow-none"
           >
             Sell
           </TabsTrigger>
@@ -172,7 +172,9 @@ function PlaceOrder({ symbol }: { symbol: string }) {
 
         {!authed && <p className="text-xs text-muted-foreground">Sign in to place orders.</p>}
         {message && (
-          <p className={cn("text-xs", message.ok ? "text-buy" : "text-sell")}>{message.text}</p>
+          <p className={cn("text-xs", message.ok ? "text-accent" : "text-negative")}>
+            {message.text}
+          </p>
         )}
 
         <Button
@@ -182,8 +184,8 @@ function PlaceOrder({ symbol }: { symbol: string }) {
           className={cn(
             "h-10 w-full text-sm font-semibold",
             side === "buy"
-              ? "bg-buy text-background hover:bg-buy/90"
-              : "bg-sell text-background hover:bg-sell/90",
+              ? "bg-accent text-accent-foreground hover:bg-accent-hover"
+              : "bg-negative text-accent-foreground hover:bg-negative/90",
           )}
         >
           {submitting ? "Placing…" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}

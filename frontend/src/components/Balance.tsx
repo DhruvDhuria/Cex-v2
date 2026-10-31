@@ -85,11 +85,11 @@ export default function Balance({ initialMode = "add" }: { initialMode?: Mode })
   };
 
   return (
-    <div className="flex w-80 flex-col gap-3 rounded-lg bg-slate-950 p-4 text-sm">
+    <div className="flex w-80 flex-col gap-3 rounded-lg bg-panel p-4 text-sm">
       <span className="text-sm font-semibold">Wallet</span>
 
       <div className="flex flex-col gap-1">
-        {loadingBalances && <p className="text-xs text-gray-500">Loading balances…</p>}
+        {loadingBalances && <p className="text-xs text-muted-foreground">Loading balances…</p>}
         {!loadingBalances && (
           <div className="flex flex-col gap-0.5 text-xs">
             {SUPPORTED_ASSETS.map((a) => {
@@ -98,10 +98,12 @@ export default function Balance({ initialMode = "add" }: { initialMode?: Mode })
               const locked = bal?.locked ?? 0;
               return (
                 <div key={a} className="flex items-center justify-between px-1 py-0.5">
-                  <span className="text-gray-400">{ASSET_LABELS[a]}</span>
-                  <span className="text-gray-200">
+                  <span className="text-muted-foreground">{ASSET_LABELS[a]}</span>
+                  <span className="text-foreground">
                     {available}
-                    {locked > 0 && <span className="text-gray-500"> ({locked} locked)</span>}
+                    {locked > 0 && (
+                      <span className="text-muted-foreground"> ({locked} locked)</span>
+                    )}
                   </span>
                 </div>
               );
@@ -115,8 +117,10 @@ export default function Balance({ initialMode = "add" }: { initialMode?: Mode })
           type="button"
           onClick={() => setMode("add")}
           className={cn(
-            "rounded px-2 py-1.5 text-xs font-medium transition-colors",
-            mode === "add" ? "bg-green-600 text-white" : "text-gray-300 hover:bg-input/40",
+            "rounded border border-transparent px-2 py-1.5 text-xs font-medium transition-colors",
+            mode === "add"
+              ? "bg-accent text-accent-foreground"
+              : "text-muted-foreground hover:bg-input/40",
           )}
         >
           Add
@@ -125,8 +129,10 @@ export default function Balance({ initialMode = "add" }: { initialMode?: Mode })
           type="button"
           onClick={() => setMode("withdraw")}
           className={cn(
-            "rounded px-2 py-1.5 text-xs font-medium transition-colors",
-            mode === "withdraw" ? "bg-red-600 text-white" : "text-gray-300 hover:bg-input/40",
+            "rounded border border-transparent px-2 py-1.5 text-xs font-medium transition-colors",
+            mode === "withdraw"
+              ? "border-white/10 bg-surface-raised text-foreground"
+              : "text-muted-foreground hover:bg-input/40",
           )}
         >
           Withdraw
@@ -134,7 +140,7 @@ export default function Balance({ initialMode = "add" }: { initialMode?: Mode })
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="asset" className="text-xs text-gray-400">
+        <Label htmlFor="asset" className="text-xs text-muted-foreground">
           Asset
         </Label>
         <Select value={asset} onValueChange={(v) => setAsset(v as FundingAsset)} disabled={!authed}>
@@ -152,7 +158,7 @@ export default function Balance({ initialMode = "add" }: { initialMode?: Mode })
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="amount" className="text-xs text-gray-400">
+        <Label htmlFor="amount" className="text-xs text-muted-foreground">
           Amount
         </Label>
         <Input
@@ -167,20 +173,18 @@ export default function Balance({ initialMode = "add" }: { initialMode?: Mode })
         />
       </div>
 
-      {!authed && <p className="text-xs text-gray-500">Sign in to manage balances.</p>}
+      {!authed && <p className="text-xs text-muted-foreground">Sign in to manage balances.</p>}
       {message && (
-        <p className={cn("text-xs", message.ok ? "text-green-500" : "text-red-500")}>{message.text}</p>
+        <p className={cn("text-xs", message.ok ? "text-accent" : "text-negative")}>
+          {message.text}
+        </p>
       )}
 
       <Button
         disabled={!authed || submitting}
         onClick={() => void handleSubmit()}
-        className={cn(
-          "w-full",
-          mode === "add"
-            ? "bg-green-600 text-white hover:bg-green-700"
-            : "bg-red-600 text-white hover:bg-red-700",
-        )}
+        variant={mode === "add" ? "default" : "outline"}
+        className={cn("w-full", mode === "withdraw" && "border-white/15")}
       >
         {submitting
           ? "Processing…"

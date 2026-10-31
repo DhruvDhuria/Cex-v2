@@ -7,6 +7,7 @@ import type {
 import { fetchTradeHistory, type TradeRecord } from "@/lib/api";
 import type { TradePayload } from "@/lib/streamPayloads";
 import type { SubscribeToTrades } from "@/hooks/useMarketData";
+import { getThemeColor, withAlpha } from "@/lib/theme";
 
 export type CandleInterval = "1s" | "1m" | "5m";
 
@@ -17,9 +18,6 @@ export const INTERVAL_SECONDS: Record<CandleInterval, number> = {
   "1m": 60,
   "5m": 300,
 };
-
-const UP_VOLUME_COLOR = "rgba(38, 166, 154, 0.5)";
-const DOWN_VOLUME_COLOR = "rgba(239, 83, 80, 0.5)";
 
 const STORAGE_PREFIX = "cex_candles";
 const MAX_CACHED_BARS = 500;
@@ -121,12 +119,25 @@ function lastBucketOf(bars: Map<number, Bar>): number | null {
   return last;
 }
 
+let cachedVolumeColors: { up: string; down: string } | null = null;
+
+function getVolumeColors(): { up: string; down: string } {
+  if (!cachedVolumeColors) {
+    cachedVolumeColors = {
+      up: withAlpha(getThemeColor("--accent"), 0.45),
+      down: withAlpha(getThemeColor("--negative"), 0.45),
+    };
+  }
+  return cachedVolumeColors;
+}
+
 function toSeries(bars: Map<number, Bar>): {
   candles: CandlestickData<UTCTimestamp>[];
   volumes: HistogramData<UTCTimestamp>[];
 } {
   const candles: CandlestickData<UTCTimestamp>[] = [];
   const volumes: HistogramData<UTCTimestamp>[] = [];
+  const volumeColors = getVolumeColors();
 
   const sorted = [...bars.entries()].sort((a, b) => a[0] - b[0]);
   for (const [time, bar] of sorted) {
@@ -140,7 +151,7 @@ function toSeries(bars: Map<number, Bar>): {
     volumes.push({
       time: time as UTCTimestamp,
       value: bar.volume,
-      color: bar.close >= bar.open ? UP_VOLUME_COLOR : DOWN_VOLUME_COLOR,
+      color: bar.close >= bar.open ? volumeColors.up : volumeColors.down,
     });
   }
   return { candles, volumes };

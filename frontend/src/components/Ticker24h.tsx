@@ -75,7 +75,7 @@ function Ticker24h({
             ? `${positive ? "+" : ""}${formatNumber(change, 2)}%`
             : "—"
         }
-        className={ticker ? (positive ? "text-buy" : "text-sell") : undefined}
+        className={ticker ? (positive ? "text-accent" : "text-negative") : undefined}
       />
       <Stat
         label="24h high"

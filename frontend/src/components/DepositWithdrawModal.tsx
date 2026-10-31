@@ -83,8 +83,10 @@ export default function DepositWithdrawModal({
               type="button"
               onClick={() => setMode("add")}
               className={cn(
-                "rounded px-2 py-1.5 text-xs font-medium transition-colors",
-                mode === "add" ? "bg-green-600 text-white" : "text-muted-foreground hover:bg-muted",
+                "rounded border border-transparent px-2 py-1.5 text-xs font-medium transition-colors",
+                mode === "add"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-muted",
               )}
             >
               Deposit
@@ -93,8 +95,10 @@ export default function DepositWithdrawModal({
               type="button"
               onClick={() => setMode("withdraw")}
               className={cn(
-                "rounded px-2 py-1.5 text-xs font-medium transition-colors",
-                mode === "withdraw" ? "bg-red-600 text-white" : "text-muted-foreground hover:bg-muted",
+                "rounded border border-transparent px-2 py-1.5 text-xs font-medium transition-colors",
+                mode === "withdraw"
+                  ? "border-white/10 bg-surface-raised text-foreground"
+                  : "text-muted-foreground hover:bg-muted",
               )}
             >
               Withdraw
@@ -137,18 +141,16 @@ export default function DepositWithdrawModal({
 
           {!authed && <p className="text-xs text-muted-foreground">Sign in to manage balances.</p>}
           {message && (
-            <p className={cn("text-xs", message.ok ? "text-green-500" : "text-red-500")}>{message.text}</p>
+            <p className={cn("text-xs", message.ok ? "text-accent" : "text-negative")}>
+              {message.text}
+            </p>
           )}
 
           <Button
             disabled={!authed || submitting}
             onClick={() => void handleSubmit()}
-            className={cn(
-              "w-full",
-              mode === "add"
-                ? "bg-green-600 text-white hover:bg-green-700"
-                : "bg-red-600 text-white hover:bg-red-700",
-            )}
+            variant={mode === "add" ? "default" : "outline"}
+            className={cn("w-full", mode === "withdraw" && "border-white/15")}
           >
             {submitting ? "Processing…" : `${mode === "add" ? "Deposit" : "Withdraw"} ${ASSET_LABELS[asset]}`}
           </Button>

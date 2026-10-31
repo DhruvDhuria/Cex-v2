@@ -1,6 +1,7 @@
 import React from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import Navbar from "@/components/Navbar";
+import LandingPage from "@/pages/LandingPage";
 import Trade from "@/pages/Trade";
 import Dashboard from "@/pages/Dashboard";
 import SigninPage from "@/pages/auth/SigninPage";
@@ -13,7 +14,7 @@ export function App() {
       <Navbar />
       <main className="flex flex-1 flex-col bg-background">
         <Routes>
-          <Route path="/" element={<Navigate to="/trade" replace />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/trade" element={<Trade />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/signin" element={<SigninPage />} />

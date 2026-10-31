@@ -21,10 +21,8 @@ import {
 } from "@/hooks/useCandles";
 import { quotePair } from "@/lib/api";
 import type { SubscribeToTrades } from "@/hooks/useMarketData";
+import { getThemeColor } from "@/lib/theme";
 import { Panel } from "./Panel";
-
-const UP_COLOR = "#26a69a";
-const DOWN_COLOR = "#ef5350";
 
 function Chart({
   symbol,
@@ -50,6 +48,9 @@ function Chart({
     const container = containerRef.current;
     if (!container) return;
 
+    const upColor = getThemeColor("--accent");
+    const downColor = getThemeColor("--negative");
+
     const chart = createChart(container, {
       autoSize: false,
       width: container.clientWidth,
@@ -71,11 +72,11 @@ function Chart({
     const candleSeries = chart.addSeries(
       CandlestickSeries,
       {
-        upColor: UP_COLOR,
-        downColor: DOWN_COLOR,
+        upColor,
+        downColor,
         borderVisible: false,
-        wickUpColor: UP_COLOR,
-        wickDownColor: DOWN_COLOR,
+        wickUpColor: upColor,
+        wickDownColor: downColor,
       },
       0,
     );
