@@ -42,9 +42,9 @@ export default function BalancesPanel({ refreshKey }: { refreshKey?: number }) {
               const available = bal?.available ?? 0;
               const locked = bal?.locked ?? 0;
               return (
-                <div key={a} className="flex items-center justify-between">
+                <div key={a} className="flex min-w-0 items-center justify-between gap-2">
                   <span className="text-muted-foreground">{ASSET_LABELS[a] || a.toUpperCase()}</span>
-                  <span>
+                  <span className="shrink-0 text-right tabular-nums">
                     {available}
                     {locked > 0 && <span className="text-muted-foreground"> ({locked} locked)</span>}
                   </span>

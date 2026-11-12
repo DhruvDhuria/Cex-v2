@@ -93,7 +93,10 @@ function PlaceOrder({ symbol }: { symbol: string }) {
   };
 
   return (
-    <Panel className="h-3/4 min-w-72 max-w-80" bodyClassName="flex flex-col">
+    <Panel
+      className="h-auto w-full max-w-md lg:h-full lg:min-w-72 lg:max-w-80"
+      bodyClassName="flex flex-col overflow-y-auto"
+    >
       <Tabs value={side} onValueChange={(value) => setSide(value as OrderSide)}>
         <TabsList className="h-16 w-full rounded-none border-b border-hairline bg-transparent p-0">
           <TabsTrigger
@@ -111,7 +114,7 @@ function PlaceOrder({ symbol }: { symbol: string }) {
         </TabsList>
       </Tabs>
 
-      <div className="flex flex-col gap-3 p-3">
+      <div className="flex flex-1 flex-col gap-3 p-3">
         <Tabs value={type} onValueChange={(value) => setType(value as OrderType)}>
           <TabsList className="h-9 w-fit gap-2 bg-muted/60 p-0.5">
             <TabsTrigger value="limit" className="h-8 px-3 text-[11px]">
@@ -182,7 +185,7 @@ function PlaceOrder({ symbol }: { symbol: string }) {
           disabled={!authed || submitting}
           onClick={() => void handleSubmit()}
           className={cn(
-            "h-10 w-full text-sm font-semibold",
+            "mt-auto h-10 w-full text-sm font-semibold",
             side === "buy"
               ? "bg-accent text-accent-foreground hover:bg-accent-hover"
               : "bg-negative text-accent-foreground hover:bg-negative/90",

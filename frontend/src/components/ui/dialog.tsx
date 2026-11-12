@@ -24,12 +24,12 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 sm:p-6">
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-10">{children}</div>
+      <div className="relative z-10 w-full max-w-sm">{children}</div>
     </div>
   );
 }
@@ -38,7 +38,7 @@ function DialogContent({ className, ...props }: React.HTMLAttributes<HTMLDivElem
   return (
     <div
       className={cn(
-        "w-full max-w-sm rounded-md border border-hairline bg-surface p-4 shadow-lg",
+        "max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-md border border-hairline bg-surface p-4 shadow-lg",
         className,
       )}
       {...props}

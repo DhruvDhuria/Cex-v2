@@ -32,7 +32,7 @@ function Signup() {
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)}>
-      <h1 className="text-4xl pb-2 font-bold">Create an Account</h1>
+      <h1 className="text-3xl pb-2 font-bold sm:text-4xl">Create an Account</h1>
       <p className="text-xs text-muted-foreground pb-4">Fill in the details below to create your account.</p>
       <div className="flex flex-col gap-2">
         <Label htmlFor="username">Username</Label>

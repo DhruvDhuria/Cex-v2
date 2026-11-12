@@ -15,15 +15,15 @@ export default function Trade() {
   const { trades, lastPrice, subscribeToTrades } = useMarketData(symbol);
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 p-4">
       <div className="flex flex-col gap-4 lg:flex-row">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <Ticker24h symbol={symbol} onSymbolChange={setSymbol} />
-          <div className="flex h-[calc(100vh-14rem)] min-h-[400px] flex-col gap-4 lg:flex-row">
-            <div className="min-h-0 min-w-0 flex-1 lg:w-2/3">
+          <div className="flex flex-col gap-4 lg:h-[calc(100dvh-14rem)] lg:min-h-[480px] lg:flex-row">
+            <div className="h-[50vh] min-h-[300px] min-w-0 sm:h-[55vh] lg:h-full lg:flex-1 lg:w-2/3">
               <Chart symbol={symbol} subscribeToTrades={subscribeToTrades} />
             </div>
-            <div className="flex h-full min-h-0 w-full flex-col rounded-md border border-hairline bg-surface-raised p-3 lg:w-1/3">
+            <div className="flex min-h-0 w-full flex-col rounded-md border border-hairline bg-surface-raised p-3 lg:h-full lg:w-1/3">
               <Tabs
                 value={update}
                 onValueChange={(v) => setUpdate(v as UpdateType)}

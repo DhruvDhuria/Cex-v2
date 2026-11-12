@@ -16,13 +16,13 @@ function OrdersTable({ orders, title }: { orders: Order[]; title: string }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-muted-foreground">
-              <th className="pb-2 pr-4">Market</th>
-              <th className="pb-2 pr-4">Side</th>
-              <th className="pb-2 pr-4">Type</th>
-              <th className="pb-2 pr-4">Price</th>
-              <th className="pb-2 pr-4">Qty</th>
-              <th className="pb-2 pr-4">Filled</th>
-              <th className="pb-2 pr-4">Status</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Market</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Side</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Type</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Price</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Qty</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Filled</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -35,13 +35,13 @@ function OrdersTable({ orders, title }: { orders: Order[]; title: string }) {
             )}
             {orders.map((o) => (
               <tr key={o.id} className="border-t border-hairline">
-                <td className="py-2 pr-4">{o.market}</td>
-                <td className="py-2 pr-4 uppercase">{o.side}</td>
-                <td className="py-2 pr-4 uppercase">{o.type}</td>
-                <td className="py-2 pr-4">{o.price ?? "-"}</td>
-                <td className="py-2 pr-4">{o.quantity}</td>
-                <td className="py-2 pr-4">{o.filledQuantity}</td>
-                <td className="py-2 pr-4 uppercase">{o.status}</td>
+                <td className="whitespace-nowrap py-2 pr-4">{o.market}</td>
+                <td className="whitespace-nowrap py-2 pr-4 uppercase">{o.side}</td>
+                <td className="whitespace-nowrap py-2 pr-4 uppercase">{o.type}</td>
+                <td className="whitespace-nowrap py-2 pr-4">{o.price ?? "-"}</td>
+                <td className="whitespace-nowrap py-2 pr-4">{o.quantity}</td>
+                <td className="whitespace-nowrap py-2 pr-4">{o.filledQuantity}</td>
+                <td className="whitespace-nowrap py-2 pr-4 uppercase">{o.status}</td>
               </tr>
             ))}
           </tbody>
@@ -61,12 +61,12 @@ function FillsTable({ fills }: { fills: FillRecord[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-muted-foreground">
-              <th className="pb-2 pr-4">Asset</th>
-              <th className="pb-2 pr-4">Side</th>
-              <th className="pb-2 pr-4">Type</th>
-              <th className="pb-2 pr-4">Price</th>
-              <th className="pb-2 pr-4">Qty</th>
-              <th className="pb-2 pr-4">Order</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Asset</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Side</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Type</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Price</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Qty</th>
+              <th className="whitespace-nowrap pb-2 pr-4">Order</th>
             </tr>
           </thead>
           <tbody>
@@ -79,12 +79,12 @@ function FillsTable({ fills }: { fills: FillRecord[] }) {
             )}
             {fills.map((f) => (
               <tr key={f.id} className="border-t border-hairline">
-                <td className="py-2 pr-4">{f.asset}</td>
-                <td className="py-2 pr-4 uppercase">{f.side}</td>
-                <td className="py-2 pr-4 uppercase">{f.type}</td>
-                <td className="py-2 pr-4">{f.price}</td>
-                <td className="py-2 pr-4">{f.quantity}</td>
-                <td className="py-2 pr-4 truncate max-w-[200px]">{f.orignalOrderId}</td>
+                <td className="whitespace-nowrap py-2 pr-4">{f.asset}</td>
+                <td className="whitespace-nowrap py-2 pr-4 uppercase">{f.side}</td>
+                <td className="whitespace-nowrap py-2 pr-4 uppercase">{f.type}</td>
+                <td className="whitespace-nowrap py-2 pr-4">{f.price}</td>
+                <td className="whitespace-nowrap py-2 pr-4">{f.quantity}</td>
+                <td className="max-w-[200px] truncate py-2 pr-4">{f.orignalOrderId}</td>
               </tr>
             ))}
           </tbody>
@@ -137,7 +137,7 @@ export default function Dashboard() {
   }, [load]);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6">
       <ProfileHeader username={username} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1">
@@ -145,16 +145,16 @@ export default function Dashboard() {
         </div>
         <div className="lg:col-span-2">
           <Tabs defaultValue="open" className="w-full">
-            <TabsList className="h-9 w-fit gap-2 bg-muted/60 p-0.5">
-              <TabsTrigger value="open" className="h-8 px-3 text-[11px]">
-                Open Orders
-              </TabsTrigger>
-              <TabsTrigger value="history" className="h-8 px-3 text-[11px]">
-                Order History
-              </TabsTrigger>
-              <TabsTrigger value="fills" className="h-8 px-3 text-[11px]">
-                Fills
-              </TabsTrigger>
+            <TabsList className="h-9 w-full gap-1 bg-muted/60 p-0.5 sm:w-fit sm:gap-2">
+            <TabsTrigger value="open" className="h-8 flex-1 px-3 text-[11px] sm:flex-none">
+              Open Orders
+            </TabsTrigger>
+            <TabsTrigger value="history" className="h-8 flex-1 px-3 text-[11px] sm:flex-none">
+              Order History
+            </TabsTrigger>
+            <TabsTrigger value="fills" className="h-8 flex-1 px-3 text-[11px] sm:flex-none">
+              Fills
+            </TabsTrigger>
             </TabsList>
             <TabsContent value="open" className="mt-4">
               {loading ? <p className="text-xs text-muted-foreground">Loading...</p> : <OrdersTable orders={openOrders} title="Open Orders" />}

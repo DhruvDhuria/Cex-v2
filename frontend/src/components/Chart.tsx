@@ -239,7 +239,7 @@ function Chart({
         </Tabs>
       }
     >
-      <div ref={containerRef} className="min-h-80 w-full flex-1" />
+      <div ref={containerRef} className="min-h-[240px] w-full flex-1 sm:min-h-[320px]" />
       <div className="num flex items-center justify-between border-t border-hairline px-3 py-1.5 text-[10px] text-muted-foreground">
         <span>
           {candles.length > 0

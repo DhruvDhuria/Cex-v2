@@ -21,7 +21,7 @@ function Stat({
   className?: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-col justify-center gap-0.5 px-4">
+    <div className="flex min-w-0 flex-col justify-center gap-0.5 px-3 sm:px-4">
       <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
         {label}
       </span>
@@ -51,7 +51,7 @@ function Ticker24h({
       {onSymbolChange && (
         <div className="flex items-center px-3">
           <Select value={symbol} onValueChange={(v) => onSymbolChange(v as Symbol_)}>
-            <SelectTrigger className="h-8 w-28">
+            <SelectTrigger className="h-8 w-24 sm:w-28">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -86,7 +86,7 @@ export default function Orderbook({
   return (
     <Panel
       title={quotePair(symbol)}
-      className="min-w-64 max-w-80"
+      className="w-full min-w-0"
       bodyClassName="flex flex-col"
       actions={
         <div className="flex items-center rounded border border-hairline p-0.5">

@@ -17,13 +17,13 @@ export default function ProfileHeader({
   const initials = getInitials(username);
 
   return (
-    <div className="flex w-full items-center justify-between rounded-md border border-hairline bg-surface px-4 py-3">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted text-sm font-semibold">
+    <div className="flex w-full min-w-0 items-center justify-between gap-3 rounded-md border border-hairline bg-surface px-4 py-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted text-sm font-semibold">
           {initials}
         </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-medium">{username || "User"}</span>
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-sm font-medium">{username || "User"}</span>
           <span className="text-xs text-muted-foreground">Account</span>
         </div>
       </div>

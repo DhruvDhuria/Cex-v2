@@ -94,7 +94,7 @@ function FeatureCard({ feature }: { feature: Feature }) {
 
 function HeroVisual() {
   return (
-    <div aria-hidden="true" className="relative mx-auto aspect-square w-full max-w-[420px]">
+    <div aria-hidden="true" className="relative mx-auto aspect-square w-full max-w-[280px] sm:max-w-[360px] lg:max-w-[420px]">
       <div
         className="absolute inset-0 rounded-full"
         style={{
@@ -144,14 +144,14 @@ export default function LandingPage() {
               "radial-gradient(circle, color-mix(in oklab, var(--accent) 8%, transparent), transparent 68%)",
           }}
         />
-        <div className="relative mx-auto grid w-full max-w-6xl gap-14 px-6 pb-20 pt-16 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-10 lg:pb-28 lg:pt-24">
+        <div className="relative mx-auto grid w-full max-w-6xl gap-14 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-10 lg:pb-28 lg:pt-24">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs font-medium text-slate-300">
               <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               Spot trading, made straightforward
             </div>
 
-            <h1 className="mt-6 max-w-3xl text-5xl font-semibold leading-[1.04] tracking-[-0.045em] text-white sm:text-6xl lg:text-7xl">
+            <h1 className="mt-6 max-w-3xl text-4xl font-semibold leading-[1.04] tracking-[-0.045em] text-white sm:text-5xl md:text-6xl lg:text-7xl">
               Your Crypto Journey.
               <span className="block text-accent">One Exchange.</span>
             </h1>
@@ -193,7 +193,7 @@ export default function LandingPage() {
       </section>
 
       <section id="features" className="scroll-mt-24 border-t border-white/[0.06] py-20 sm:py-24">
-        <div className="mx-auto max-w-6xl px-6">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <SectionHeading
             eyebrow="Platform"
             title="Everything you need to trade with clarity."
@@ -208,7 +208,7 @@ export default function LandingPage() {
       </section>
 
       <section className="border-t border-white/[0.06] py-20 sm:py-24">
-        <div className="mx-auto max-w-6xl px-6">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <SectionHeading
             eyebrow="How it works"
             title="From account to first trade."
@@ -228,7 +228,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="px-6 pb-20 pt-4 sm:pb-24">
+      <section className="px-4 pb-20 pt-4 sm:px-6 sm:pb-24">
         <div className="relative mx-auto max-w-6xl overflow-hidden rounded-2xl border border-white/10 bg-panel px-6 py-14 text-center sm:px-12 sm:py-16">
           <div
             aria-hidden="true"
@@ -260,7 +260,7 @@ export default function LandingPage() {
       </section>
 
       <footer id="about" className="scroll-mt-24 border-t border-white/[0.06]">
-        <div className="mx-auto max-w-6xl px-6 py-14">
+        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
           <div className="grid gap-10 md:grid-cols-[1.5fr_1fr_1fr]">
             <div>
               <Link

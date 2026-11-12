@@ -12,7 +12,7 @@ function formatTime(ts: number): string {
 
 export default function Trades({ trades }: { trades: Trade[] }) {
   return (
-    <Panel title="Trades" className="min-w-64 max-w-80" bodyClassName="flex flex-col">
+    <Panel title="Trades" className="w-full min-w-0" bodyClassName="flex flex-col">
       <div className="grid grid-cols-3 px-3 py-1.5 text-right text-[10px] tracking-wide text-muted-foreground uppercase">
         <span className="text-left">Price</span>
         <span>Size</span>
