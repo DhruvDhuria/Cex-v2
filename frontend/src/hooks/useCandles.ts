@@ -19,7 +19,7 @@ export const INTERVAL_SECONDS: Record<CandleInterval, number> = {
   "5m": 300,
 };
 
-const STORAGE_PREFIX = "cex_candles";
+const STORAGE_PREFIX = "cex_candles_v2";
 const MAX_CACHED_BARS = 500;
 const PERSIST_DEBOUNCE_MS = 300;
 
