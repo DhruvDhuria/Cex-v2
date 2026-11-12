@@ -47,7 +47,7 @@ export default function Navbar() {
       localStorage.removeItem("cex_username");
     }
     setMenuOpen(false);
-    navigate("/trade");
+    navigate("/");
   };
 
   const goToSection = (id: string) => {
@@ -73,10 +73,10 @@ export default function Navbar() {
         isLanding ? "border-white/10 bg-ink/85" : "border-slate-800 bg-slate-950/90"
       }`}
     >
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
-        <div className="flex items-center gap-6">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-6">
           <Link
-            to="/"
+            to={authed ? "/trade" : "/"}
             className="flex items-center gap-2.5 text-lg font-semibold tracking-[0.08em] text-white"
             onClick={handleHomeClick}
           >
@@ -88,38 +88,47 @@ export default function Navbar() {
             </span>
             {BRAND_NAME}
           </Link>
-          <nav className="hidden items-center gap-5 md:flex" aria-label="Primary">
-            <NavLink to="/" end className={navLinkClass}>
-              Home
-            </NavLink>
-            <NavLink to="/trade" className={navLinkClass}>
-              Trade
-            </NavLink>
-            <a
-              href="/#features"
-              className={sectionLinkClass}
-              onClick={(event) => {
-                event.preventDefault();
-                goToSection("features");
-              }}
-            >
-              Features
-            </a>
-            <a
-              href="/#about"
-              className={sectionLinkClass}
-              onClick={(event) => {
-                event.preventDefault();
-                goToSection("about");
-              }}
-            >
-              About
-            </a>
+          <nav className="hidden items-center gap-5 lg:flex" aria-label="Primary">
+            {!authed && (
+              <>
+                <NavLink to="/" end className={navLinkClass}>
+                  Home
+                </NavLink>
+                <NavLink to="/trade" className={navLinkClass}>
+                  Trade
+                </NavLink>
+                <a
+                  href="/#features"
+                  className={sectionLinkClass}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    goToSection("features");
+                  }}
+                >
+                  Features
+                </a>
+                <a
+                  href="/#about"
+                  className={sectionLinkClass}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    goToSection("about");
+                  }}
+                >
+                  About
+                </a>
+              </>
+            )}
+            {authed && (
+              <NavLink to="/trade" className={navLinkClass}>
+                Trade
+              </NavLink>
+            )}
           </nav>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="hidden items-center gap-2 lg:flex">
             {authed ? (
               <>
                 <Button asChild variant="outline" size="sm">
@@ -150,7 +159,7 @@ export default function Navbar() {
 
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 text-slate-300 transition-colors hover:bg-white/5 hover:text-white md:hidden"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 text-slate-300 transition-colors hover:bg-white/5 hover:text-white lg:hidden"
             aria-label={menuOpen ? "Close navigation" : "Open navigation"}
             aria-expanded={menuOpen}
             aria-controls="mobile-nav"
@@ -162,42 +171,55 @@ export default function Navbar() {
       </div>
 
       {menuOpen && (
-        <div id="mobile-nav" className="border-t border-slate-800/80 px-4 pb-4 pt-3 md:hidden">
+        <div id="mobile-nav" className="border-t border-slate-800/80 px-4 pb-4 pt-3 lg:hidden">
           <nav aria-label="Mobile" className="flex flex-col gap-1">
-            <Link to="/" className={mobileItemClass} onClick={handleHomeClick}>
-              Home
-            </Link>
-            <Link to="/trade" className={mobileItemClass} onClick={() => setMenuOpen(false)}>
-              Trade
-            </Link>
-            <a
-              href="/#features"
-              className={mobileItemClass}
-              onClick={(event) => {
-                event.preventDefault();
-                goToSection("features");
-              }}
-            >
-              Features
-            </a>
-            <a
-              href="/#about"
-              className={mobileItemClass}
-              onClick={(event) => {
-                event.preventDefault();
-                goToSection("about");
-              }}
-            >
-              About
-            </a>
+            {!authed && (
+              <>
+                <Link to="/" className={mobileItemClass} onClick={handleHomeClick}>
+                  Home
+                </Link>
+                <Link to="/trade" className={mobileItemClass} onClick={() => setMenuOpen(false)}>
+                  Trade
+                </Link>
+                <a
+                  href="/#features"
+                  className={mobileItemClass}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    goToSection("features");
+                  }}
+                >
+                  Features
+                </a>
+                <a
+                  href="/#about"
+                  className={mobileItemClass}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    goToSection("about");
+                  }}
+                >
+                  About
+                </a>
+              </>
+            )}
             {authed && (
-              <Link
-                to="/dashboard"
-                className={mobileItemClass}
-                onClick={() => setMenuOpen(false)}
-              >
-                Dashboard
-              </Link>
+              <>
+                <Link
+                  to="/trade"
+                  className={mobileItemClass}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Trade
+                </Link>
+                <Link
+                  to="/dashboard"
+                  className={mobileItemClass}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
+              </>
             )}
           </nav>
 
