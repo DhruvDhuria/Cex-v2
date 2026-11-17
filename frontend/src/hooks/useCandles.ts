@@ -9,14 +9,22 @@ import type { TradePayload } from "@/lib/streamPayloads";
 import type { SubscribeToTrades } from "@/hooks/useMarketData";
 import { getThemeColor, withAlpha } from "@/lib/theme";
 
-export type CandleInterval = "1s" | "1m" | "5m";
+export type CandleInterval = "1s" | "1m" | "5m" | "15m" | "30m";
 
-export const CANDLE_INTERVALS: readonly CandleInterval[] = ["1s", "1m", "5m"];
+export const CANDLE_INTERVALS: readonly CandleInterval[] = [
+  "1s",
+  "1m",
+  "5m",
+  "15m",
+  "30m",
+];
 
 export const INTERVAL_SECONDS: Record<CandleInterval, number> = {
   "1s": 1,
   "1m": 60,
   "5m": 300,
+  "15m": 900,
+  "30m": 1800,
 };
 
 const STORAGE_PREFIX = "cex_candles_v2";
