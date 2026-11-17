@@ -8,7 +8,6 @@ import {
 } from "lightweight-charts";
 import type {
   IChartApi,
-  IPanePrimitive,
   ISeriesApi,
   ITextWatermarkPluginApi,
   Time,
@@ -39,7 +38,6 @@ function Chart({
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const watermarkRef = useRef<ITextWatermarkPluginApi<Time> | null>(null);
-  const watermarkVisibleRef = useRef(false);
   const hasDataRef = useRef(false);
   const resizeRafRef = useRef<number | null>(null);
 
@@ -98,7 +96,6 @@ function Chart({
         },
       ],
     });
-    watermarkVisibleRef.current = true;
 
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
@@ -136,7 +133,6 @@ function Chart({
       volumeSeriesRef.current = null;
       chartRef.current = null;
       hasDataRef.current = false;
-      watermarkVisibleRef.current = false;
       chart.remove();
     };
   }, []);
@@ -150,19 +146,7 @@ function Chart({
       // ignore
     }
     hasDataRef.current = false;
-    if (watermarkRef.current && chartRef.current) {
-      try {
-        if (!watermarkVisibleRef.current) {
-          chartRef.current
-            .panes()[0]?.attachPrimitive(
-              watermarkRef.current as unknown as IPanePrimitive<Time>,
-            );
-        }
-        watermarkVisibleRef.current = true;
-      } catch {
-        // ignore
-      }
-    }
+    watermarkRef.current?.applyOptions({ visible: true });
   }, [symbol, interval]);
 
   // Incremental updates: setData only for the first full snapshot, update() after.
@@ -207,19 +191,7 @@ function Chart({
       }
     }
 
-    if (watermarkRef.current && chartRef.current) {
-      try {
-        if (watermarkVisibleRef.current) {
-          chartRef.current
-            .panes()[0]?.detachPrimitive(
-              watermarkRef.current as unknown as IPanePrimitive<Time>,
-            );
-        }
-      } catch {
-        // ignore
-      }
-      watermarkVisibleRef.current = false;
-    }
+    watermarkRef.current?.applyOptions({ visible: false });
   }, [candles, volumes]);
 
   return (
